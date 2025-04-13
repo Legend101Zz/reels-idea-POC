@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  darkMode: ["class"],
+  darkMode: "class",
   content: [
     "./pages/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
@@ -11,16 +11,14 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: {
-          DEFAULT: "#7C4DFF",
-          dark: "#5822FF",
-          light: "#B599FF",
-        },
-        background: {
+        primary: "#7C4DFF",
+        "primary-dark": "#5822FF",
+        "primary-light": "#B599FF",
+        bg: {
           DEFAULT: "#141414",
           light: "#1E1E1E",
         },
-        text: {
+        txt: {
           DEFAULT: "#FFFFFF",
           secondary: "#B3B3B3",
         },
