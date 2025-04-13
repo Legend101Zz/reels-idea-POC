@@ -1,4 +1,3 @@
-// tailwind.config.ts
 import type { Config } from "tailwindcss";
 
 const config: Config = {
@@ -12,31 +11,44 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Enhanced color palette
+        // Direct colors for basic utility classes
+        background: "#0c0612", // This creates the bg-background class
+        foreground: "#ffffff", // This creates the text-foreground class
+
+        // Keep your nested structure for variants
+        "background-lighter": "#1a1522",
+        "background-card": "#241b2e",
+        "background-dark": "#080309",
+        // Enhanced color palette with new gradient colors
         primary: {
-          DEFAULT: "#7C4DFF",
-          dark: "#5822FF",
-          light: "#B599FF",
-          // Additional shades for more depth
-          50: "#F4F0FF",
-          100: "#E6DDFF",
-          200: "#CDBAFF",
-          300: "#B599FF", // Same as primary-light
-          400: "#9C77FF",
-          500: "#7C4DFF", // Same as primary DEFAULT
-          600: "#6A3FE6",
-          700: "#5822FF", // Same as primary-dark
-          800: "#4A1CCC",
-          900: "#3A13A3",
+          DEFAULT: "#8f46c1",
+          dark: "#7a35ad",
+          light: "#a362d6",
+          secondary: "#d56f66",
+          // Gradient colors
+          start: "#8f46c1",
+          end: "#d56f66",
+          // Additional shades
+          50: "#f3e8fa",
+          100: "#e6d1f5",
+          200: "#d0a7eb",
+          300: "#b97ee0",
+          400: "#a362d6",
+          500: "#8f46c1",
+          600: "#7a35ad",
+          700: "#65268f",
+          800: "#501a71",
+          900: "#3b0e53",
         },
-        background: {
-          DEFAULT: "#0F0F14",
-          lighter: "#1A1A24",
-          card: "#24242E",
+        gradient: {
+          purple: "#8f46c1",
+          pink: "#a0459b",
+          magenta: "#bd4580",
+          coral: "#d56f66",
         },
         bg: {
-          DEFAULT: "#0F0F14", // Align with background
-          light: "#1A1A24",
+          DEFAULT: "#0c0612",
+          light: "#1a1522",
         },
         txt: {
           DEFAULT: "#FFFFFF",
@@ -49,26 +61,25 @@ const config: Config = {
           yellow: "#FFC14D",
           pink: "#FF4DA6",
         },
-        // Gradient stops for consistent gradients
-        gradients: {
-          primary: {
-            start: "#7C4DFF",
-            end: "#B599FF",
-          },
-          dark: {
-            start: "#121218",
-            end: "#252535",
-          },
+        card: {
+          purple: "#8f46c1",
+          pink: "#a0459b",
+          magenta: "#bd4580",
+          coral: "#d56f66",
         },
       },
       fontFamily: {
-        sans: ["Inter", "sans-serif"],
+        sans: ["Outfit", "Inter", "sans-serif"],
         display: ["Poppins", "sans-serif"],
       },
       animation: {
         "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         float: "float 6s ease-in-out infinite",
         shimmer: "shimmer 2s linear infinite",
+        "slide-up": "slide-up 0.5s ease-out",
+        "slide-down": "slide-down 0.5s ease-out",
+        "fade-in": "fade-in 0.5s ease-out",
+        "fade-out": "fade-out 0.5s ease-out",
       },
       keyframes: {
         float: {
@@ -79,9 +90,26 @@ const config: Config = {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        "slide-up": {
+          "0%": { transform: "translateY(20px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
+        "slide-down": {
+          "0%": { transform: "translateY(-20px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
+        "fade-in": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        "fade-out": {
+          "0%": { opacity: "1" },
+          "100%": { opacity: "0" },
+        },
       },
       boxShadow: {
-        glow: "0 0 15px rgba(124, 77, 255, 0.5)",
+        glow: "0 0 15px rgba(143, 70, 193, 0.5)",
+        "glow-secondary": "0 0 15px rgba(213, 111, 102, 0.5)",
         card: "0 10px 30px -5px rgba(0, 0, 0, 0.3)",
         "card-hover": "0 20px 40px -5px rgba(0, 0, 0, 0.4)",
       },
@@ -89,9 +117,23 @@ const config: Config = {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "card-shine":
           "linear-gradient(45deg, transparent 0%, rgba(255, 255, 255, 0.1) 30%, rgba(255, 255, 255, 0.1) 70%, transparent 100%)",
+        "gradient-main": "linear-gradient(to right, #8f46c1, #d56f66)",
       },
       backdropBlur: {
         xs: "2px",
+      },
+      borderRadius: {
+        xl: "1rem",
+        "2xl": "1.5rem",
+        "3xl": "2rem",
+      },
+      transitionDuration: {
+        "2000": "2000ms",
+        "3000": "3000ms",
+      },
+      scale: {
+        "102": "1.02",
+        "103": "1.03",
       },
     },
   },
