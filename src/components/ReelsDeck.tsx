@@ -1,6 +1,9 @@
+"use client";
+
 import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence, useAnimation } from 'framer-motion';
-import { FaPlay, FaVolumeUp, FaVolumeMute, FaPause, FaExpand, FaCompress } from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FaPlay, FaVolumeUp, FaVolumeMute, FaPause, FaInfo, FaRandom } from 'react-icons/fa';
+import { useSwipeable } from 'react-swipeable';
 
 interface Reel {
     id: string;
@@ -21,39 +24,98 @@ interface ReelsDeckProps {
 }
 
 export default function ReelsDeck({ reels, initialIndex = 0 }: ReelsDeckProps) {
+    // Core state
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
-    const [previousIndex, setPreviousIndex] = useState(initialIndex);
-    const [isShuffling, setIsShuffling] = useState(false);
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragStartX, setDragStartX] = useState(0);
-    const [dragStartY, setDragStartY] = useState(0);
-    const [offsetX, setOffsetX] = useState(0);
-    const [offsetY, setOffsetY] = useState(0);
-    const [direction, setDirection] = useState<'left' | 'right' | 'up' | 'down' | null>(null);
+    const [isTransitioning, setIsTransitioning] = useState(false);
+    const [swipeDirection, setSwipeDirection] = useState<null | 'left' | 'right' | 'shuffle'>(null);
     const [isMobile, setIsMobile] = useState(false);
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [videoLoaded, setVideoLoaded] = useState(false);
+    const [isShuffling, setIsShuffling] = useState(false);
+
+    // UI state
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(true);
+    const [showInfo, setShowInfo] = useState(false);
+    const [controlsVisible, setControlsVisible] = useState(true);
 
+    // Preloading state
+    const [preloadedIndexes, setPreloadedIndexes] = useState<number[]>([]);
+
+    // Refs
     const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
+    const preloadRefs = useRef<Record<string, HTMLVideoElement | null>>({});
     const deckRef = useRef<HTMLDivElement>(null);
-    const cardControls = useAnimation();
+    const controlsTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Check if on mobile device
+    // Check if we're on mobile
     useEffect(() => {
-        const checkMobile = () => {
+        const handleResize = () => {
             setIsMobile(window.innerWidth < 768);
         };
 
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Handle video loading and pausing
+    // Auto-hide controls
     useEffect(() => {
-        const currentReel = reels[currentIndex];
-        if (!currentReel) return;
+        if (controlsTimerRef.current) {
+            clearTimeout(controlsTimerRef.current);
+        }
+
+        if (controlsVisible && isPlaying && !showInfo) {
+            controlsTimerRef.current = setTimeout(() => {
+                setControlsVisible(false);
+            }, 3000);
+        }
+
+        return () => {
+            if (controlsTimerRef.current) {
+                clearTimeout(controlsTimerRef.current);
+            }
+        };
+    }, [controlsVisible, isPlaying, showInfo]);
+
+    // Preload adjacent videos
+    useEffect(() => {
+        // Only preload when not transitioning
+        if (isTransitioning) return;
+
+        const preloadAdjacent = () => {
+            // Calculate adjacent indexes (previous, next)
+            const nextIndex = (currentIndex + 1) % reels.length;
+            const prevIndex = (currentIndex - 1 + reels.length) % reels.length;
+
+            // Only preload if not already preloaded
+            const toPreload = [nextIndex, prevIndex].filter(idx => !preloadedIndexes.includes(idx));
+            if (toPreload.length === 0) return;
+
+            // Add to preloaded indexes
+            setPreloadedIndexes(prev => [...prev, ...toPreload]);
+
+            // Create preload elements
+            toPreload.forEach(idx => {
+                const videoToPreload = reels[idx];
+                if (videoToPreload) {
+                    const preloadVideo = document.createElement('video');
+                    preloadVideo.src = videoToPreload.videoUrl;
+                    preloadVideo.muted = true;
+                    preloadVideo.preload = 'auto';
+                    preloadVideo.load();
+
+                    // Store in refs
+                    preloadRefs.current[videoToPreload.id] = preloadVideo;
+                }
+            });
+        };
+
+        preloadAdjacent();
+    }, [currentIndex, isTransitioning, preloadedIndexes, reels]);
+
+    // Handle video management
+    useEffect(() => {
+        setVideoLoaded(false);
 
         // Pause all videos first
         Object.values(videoRefs.current).forEach(videoEl => {
@@ -62,430 +124,659 @@ export default function ReelsDeck({ reels, initialIndex = 0 }: ReelsDeckProps) {
             }
         });
 
-        // Then play the current one if isPlaying is true
-        const currentVideo = videoRefs.current[currentReel.id];
+        // Play current video if needed
+        const currentVideo = videoRefs.current[reels[currentIndex]?.id];
         if (currentVideo) {
             currentVideo.muted = isMuted;
 
-            if (isPlaying) {
-                currentVideo.play().catch(err => {
-                    console.error("Error playing video:", err);
-                    setIsPlaying(false);
-                });
+            // Check if video is actually loaded
+            const handleCanPlay = () => {
+                setVideoLoaded(true);
+                if (isPlaying) {
+                    currentVideo.play().catch(err => {
+                        console.error("Video playback error:", err);
+                        setIsPlaying(false);
+                    });
+                }
+            };
+
+            // Using the preloaded video data if available
+            const preloadedVideo = preloadRefs.current[reels[currentIndex]?.id];
+            if (preloadedVideo && preloadedVideo.readyState >= 3) {
+                // Copy buffer data if possible
+                currentVideo.src = preloadedVideo.src;
+                setVideoLoaded(true);
             }
+
+            // Listen for video ready event
+            currentVideo.addEventListener('canplay', handleCanPlay);
+
+            // Try to play if already loaded
+            if (currentVideo.readyState >= 3) {
+                handleCanPlay();
+            } else {
+                // Force load
+                currentVideo.load();
+            }
+
+            return () => {
+                currentVideo.removeEventListener('canplay', handleCanPlay);
+            };
         }
     }, [currentIndex, isPlaying, isMuted, reels]);
 
-    // Handle shuffling/swiping cards
-    const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
-        if (isShuffling) return;
+    // Handle card navigation 
+    const navigateToReel = (direction: 'next' | 'prev') => {
+        if (isTransitioning) return;
 
-        let clientX, clientY;
+        setIsTransitioning(true);
+        setSwipeDirection(direction === 'next' ? 'left' : 'right');
 
-        if ('touches' in e) {
-            clientX = e.touches[0].clientX;
-            clientY = e.touches[0].clientY;
-        } else {
-            clientX = e.clientX;
-            clientY = e.clientY;
-        }
+        // Show controls during navigation
+        setControlsVisible(true);
 
-        setIsDragging(true);
-        setDragStartX(clientX);
-        setDragStartY(clientY);
-        setOffsetX(0);
-        setOffsetY(0);
-    };
-
-    const handleDragMove = (e: React.MouseEvent | React.TouchEvent) => {
-        if (!isDragging) return;
-
-        let clientX, clientY;
-
-        if ('touches' in e) {
-            clientX = e.touches[0].clientX;
-            clientY = e.touches[0].clientY;
-        } else {
-            clientX = e.clientX;
-            clientY = e.clientY;
-        }
-
-        const newOffsetX = clientX - dragStartX;
-        const newOffsetY = clientY - dragStartY;
-
-        setOffsetX(newOffsetX);
-        setOffsetY(newOffsetY);
-
-        // Determine swipe direction
-        const absX = Math.abs(newOffsetX);
-        const absY = Math.abs(newOffsetY);
-
-        if (absX > absY && absX > 20) {
-            setDirection(newOffsetX > 0 ? 'right' : 'left');
-        } else if (absY > absX && absY > 20) {
-            setDirection(newOffsetY > 0 ? 'down' : 'up');
-        } else {
-            setDirection(null);
-        }
-    };
-
-    const handleDragEnd = () => {
-        if (!isDragging) return;
-        setIsDragging(false);
-
-        const threshold = 100; // min distance to trigger card change
-
-        if (direction === 'left' && Math.abs(offsetX) > threshold) {
-            handleNextCard();
-        } else if (direction === 'right' && Math.abs(offsetX) > threshold) {
-            handlePreviousCard();
-        } else if (direction === 'up' && Math.abs(offsetY) > threshold) {
-            // Could handle vertical navigation here if needed
-        } else if (direction === 'down' && Math.abs(offsetY) > threshold) {
-            // Could handle vertical navigation here if needed
-        } else {
-            // Reset position if below threshold
-            cardControls.start({
-                x: 0,
-                y: 0,
-                rotate: 0,
-                transition: { type: 'spring', stiffness: 500, damping: 30 }
+        // Update index after animation delay
+        setTimeout(() => {
+            setCurrentIndex(prevIndex => {
+                if (direction === 'next') {
+                    return (prevIndex + 1) % reels.length;
+                } else {
+                    return (prevIndex - 1 + reels.length) % reels.length;
+                }
             });
-        }
 
-        setDirection(null);
+            // Reset transition state
+            setTimeout(() => {
+                setIsTransitioning(false);
+                setSwipeDirection(null);
+                // Auto-play the new card
+                setIsPlaying(true);
+            }, 100);
+        }, 300);
     };
 
-    const handleNextCard = () => {
-        if (isShuffling) return;
+    // Handle shuffle animation - optimized for performance
+    const shuffleDeck = () => {
+        if (isTransitioning || isShuffling) return;
+
         setIsShuffling(true);
-        setPreviousIndex(currentIndex);
+        setSwipeDirection('shuffle');
+        setControlsVisible(true);
 
-        // Animate current card exit
-        cardControls.start({
-            x: -window.innerWidth,
-            rotate: -10,
-            transition: { duration: 0.4 }
-        }).then(() => {
-            setCurrentIndex((prev) => (prev + 1) % reels.length);
-            cardControls.set({ x: window.innerWidth, rotate: 10 });
-            return cardControls.start({
-                x: 0,
-                rotate: 0,
-                transition: { type: 'spring', stiffness: 200, damping: 20 }
-            });
-        }).then(() => {
-            setIsShuffling(false);
-            setIsPlaying(true); // Auto-play next card video
-        });
+        // Generate a random index different from current
+        const getRandomIndex = () => {
+            if (reels.length <= 1) return currentIndex;
+
+            let newIndex;
+            do {
+                newIndex = Math.floor(Math.random() * reels.length);
+            } while (newIndex === currentIndex);
+
+            return newIndex;
+        };
+
+        const randomIndex = getRandomIndex();
+
+        // Simplified shuffle animation for better performance
+        setTimeout(() => {
+            setCurrentIndex(randomIndex);
+
+            setTimeout(() => {
+                setIsShuffling(false);
+                setSwipeDirection(null);
+                setIsPlaying(true);
+            }, 400);
+        }, 500);
     };
 
-    const handlePreviousCard = () => {
-        if (isShuffling) return;
-        setIsShuffling(true);
-        setPreviousIndex(currentIndex);
+    // Advanced swipe handling with react-swipeable for mobile
+    const swipeHandlers = useSwipeable({
+        onSwipedLeft: () => !isShuffling && !isTransitioning && navigateToReel('next'),
+        onSwipedRight: () => !isShuffling && !isTransitioning && navigateToReel('prev'),
+        onTap: () => setControlsVisible(!controlsVisible),
+        preventDefaultTouchmoveEvent: true,
+        trackMouse: false,
+        trackTouch: true,
+        delta: 10,
+        swipeDuration: 500,
+    });
 
-        // Animate current card exit
-        cardControls.start({
-            x: window.innerWidth,
-            rotate: 10,
-            transition: { duration: 0.4 }
-        }).then(() => {
-            setCurrentIndex((prev) => (prev - 1 + reels.length) % reels.length);
-            cardControls.set({ x: -window.innerWidth, rotate: -10 });
-            return cardControls.start({
-                x: 0,
-                rotate: 0,
-                transition: { type: 'spring', stiffness: 200, damping: 20 }
-            });
-        }).then(() => {
-            setIsShuffling(false);
-            setIsPlaying(true); // Auto-play next card video
-        });
-    };
-
+    // UI event handlers
     const togglePlay = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent triggering card shuffle
+        e.stopPropagation();
         setIsPlaying(!isPlaying);
+        setControlsVisible(true);
     };
 
     const toggleMute = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent triggering card shuffle
+        e.stopPropagation();
         setIsMuted(!isMuted);
+        setControlsVisible(true);
     };
 
-    const toggleExpand = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent triggering card shuffle
-        setIsExpanded(!isExpanded);
+    const toggleInfo = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setShowInfo(!showInfo);
+        setControlsVisible(true);
+    };
+
+    const handleContainerClick = () => {
+        setControlsVisible(!controlsVisible);
     };
 
     const currentReel = reels[currentIndex];
 
-    // Generate card positions for the deck effect
-    const getCardStyle = (index: number) => {
-        if (isExpanded) {
-            return {
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                zIndex: index === currentIndex ? 10 : 5
+    // Card positioning and animation system - optimized for performance
+    const getCardTransform = (index: number) => {
+        // Only calculate for nearby cards for performance
+        const distance = Math.min(
+            Math.abs(index - currentIndex),
+            Math.abs(index + reels.length - currentIndex),
+            Math.abs(index - (currentIndex + reels.length))
+        );
+
+        // Skip cards too far away for better performance
+        if (distance > 2) return null;
+
+        const isCurrentCard = index === currentIndex;
+
+        // Default transform when card is not in transition
+        let transform = {
+            x: isCurrentCard ? 0 : (index < currentIndex ? -5 : 5) * distance,
+            y: isCurrentCard ? 0 : -10 * distance,
+            z: isCurrentCard ? 0 : -20 * distance,
+            rotateZ: isCurrentCard ? 0 : (index < currentIndex ? -5 : 5) * distance,
+            scale: isCurrentCard ? 1 : 1 - (0.05 * distance),
+            opacity: isCurrentCard ? 1 : 1 - (0.2 * distance),
+            zIndex: 10 - distance,
+        };
+
+        // Apply special animations for transitions - optimized for performant animations
+        if (isCurrentCard && swipeDirection) {
+            // Handle different types of transitions
+            if (swipeDirection === 'left') {
+                transform.x = -1000;
+                transform.rotateZ = -10;
+            } else if (swipeDirection === 'right') {
+                transform.x = 1000;
+                transform.rotateZ = 10;
+            } else if (swipeDirection === 'shuffle') {
+                // Lightweight shuffle animation
+                transform.y = -200;
+                transform.rotateZ = index % 2 ? 120 : -120;
+                transform.scale = 0.8;
+                transform.opacity = 0;
+            }
+        }
+
+        // Calculate incoming card animations
+        if (isCurrentCard && (isTransitioning || isShuffling)) {
+            if (swipeDirection === 'left') {
+                transform.x = 1000;
+                transform.rotateZ = 10;
+            } else if (swipeDirection === 'right') {
+                transform.x = -1000;
+                transform.rotateZ = -10;
+            } else if (swipeDirection === 'shuffle') {
+                transform.y = 200;
+                transform.rotateZ = index % 2 ? -120 : 120;
+                transform.scale = 0.8;
+                transform.opacity = 0;
+            }
+        }
+
+        // Special animation during shuffle - optimized to reduce complexity
+        if (isShuffling && !isCurrentCard) {
+            const angle = index % 2 ? 30 : -30;
+            const xOffset = index % 2 ? 50 : -50;
+
+            transform = {
+                ...transform,
+                x: xOffset,
+                y: -100,
+                rotateZ: angle,
+                scale: 0.7,
+                opacity: 0.5
             };
         }
 
-        const totalCards = reels.length;
-        const isCurrentCard = index === currentIndex;
-        // Calculate how "far" this card is from the current card (in either direction)
-        const distance = Math.min(
-            Math.abs(index - currentIndex),
-            Math.abs(index + totalCards - currentIndex),
-            Math.abs(index - (currentIndex + totalCards))
-        );
-
-        const MAX_VISIBLE_CARDS = 3; // Only show 3 cards in the stack
-
-        if (distance > MAX_VISIBLE_CARDS) {
-            return { display: 'none' };
-        }
-
-        const isTopCard = distance === 0;
-        const zIndex = MAX_VISIBLE_CARDS - distance;
-
-        // Create a stacked deck effect
-        const translateY = isTopCard ? 0 : -10 * distance;
-        const translateX = isTopCard ? 0 : 5 * distance;
-        const rotate = isTopCard ? 0 : (index < currentIndex ? -3 : 3) * distance;
-        const scale = isTopCard ? 1 : 1 - 0.05 * distance;
-        const opacity = isTopCard ? 1 : 1 - 0.2 * distance;
-
-        return {
-            position: 'absolute',
-            transformOrigin: 'center bottom',
-            zIndex,
-            transform: `translate(${translateX}px, ${translateY}px) rotate(${rotate}deg) scale(${scale})`,
-            opacity,
-            boxShadow: isTopCard
-                ? '0 20px 25px -5px rgba(0, 0, 0, 0.3)'
-                : '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
-            transition: isShuffling ? 'none' : 'all 0.3s ease-out'
-        };
+        return transform;
     };
 
-    return (
-        <div className={`relative ${isExpanded ? 'fixed inset-0 z-50 bg-black/90' : 'h-[500px] md:h-[600px]'}`}>
-            <div
-                ref={deckRef}
-                className={`relative w-full h-full flex items-center justify-center ${isExpanded ? 'p-4' : ''}`}
-                onMouseDown={handleDragStart}
-                onMouseMove={handleDragMove}
-                onMouseUp={handleDragEnd}
-                onMouseLeave={handleDragEnd}
-                onTouchStart={handleDragStart}
-                onTouchMove={handleDragMove}
-                onTouchEnd={handleDragEnd}
+    // Render a single card - optimized for performance
+    const renderCard = (reel: Reel, index: number) => {
+        const isCurrentCard = index === currentIndex;
+        const transform = getCardTransform(index);
+
+        // Skip rendering if transform is null (card is too far away)
+        if (!transform) return null;
+
+        // First, deal with loading state placeholders
+        const isLoading = isCurrentCard && !videoLoaded && !isTransitioning && !isShuffling;
+
+        return (
+            <motion.div
+                key={reel.id}
+                className={`absolute top-0 left-0 w-full h-full rounded-2xl overflow-hidden shadow-xl ${isCurrentCard ? 'card-active' : 'card-background'}`}
+                style={{
+                    zIndex: transform.zIndex,
+                    willChange: 'transform' // Hardware acceleration hint
+                }}
+                initial={false}
+                animate={{
+                    x: transform.x,
+                    y: transform.y,
+                    rotateZ: transform.rotateZ,
+                    scale: transform.scale,
+                    opacity: transform.opacity,
+                }}
+                transition={{
+                    type: 'tween',
+                    duration: isShuffling ? 0.6 : 0.3,
+                    ease: "easeOut"
+                }}
             >
-                <div className={`relative ${isExpanded ? 'w-full h-full max-w-3xl mx-auto' : 'w-72 h-96 md:w-80 md:h-[450px]'}`}>
-                    {/* Navigation hints */}
-                    {!isExpanded && !isDragging && !isShuffling && (
-                        <div className="absolute inset-0 z-50 pointer-events-none flex items-center justify-center">
-                            <div className="flex space-x-12 opacity-30">
-                                <motion.div
-                                    className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center"
-                                    animate={{ x: [-5, 0, -5] }}
-                                    transition={{ duration: 2, repeat: Infinity }}
-                                >
-                                    <motion.svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M15 18l-6-6 6-6" />
-                                    </motion.svg>
-                                </motion.div>
+                {/* Card content */}
+                <div className="absolute inset-0">
+                    {/* Video or thumbnail */}
+                    <div className="relative w-full h-full">
+                        {isCurrentCard ? (
+                            <>
+                                {/* Main video */}
+                                <video
+                                    ref={el => videoRefs.current[reel.id] = el}
+                                    src={reel.videoUrl}
+                                    poster={reel.thumbnailUrl}
+                                    className={`w-full h-full object-cover ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                                    playsInline
+                                    loop
+                                    muted={isMuted}
+                                    style={{ willChange: 'opacity' }} // Hardware acceleration hint
+                                />
 
-                                <motion.div
-                                    className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center"
-                                    animate={{ x: [5, 0, 5] }}
-                                    transition={{ duration: 2, repeat: Infinity }}
-                                >
-                                    <motion.svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M9 18l6-6-6-6" />
-                                    </motion.svg>
-                                </motion.div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Card Deck */}
-                    {reels.map((reel, index) => {
-                        const cardStyle = getCardStyle(index);
-
-                        // Skip rendering cards that are too far from current card
-                        if (cardStyle.display === 'none') return null;
-
-                        return (
-                            <motion.div
-                                key={reel.id}
-                                className={`absolute top-0 left-0 w-full h-full rounded-2xl overflow-hidden shadow-xl ${index === currentIndex ? 'cursor-grab active:cursor-grabbing' : ''
-                                    }`}
-                                style={cardStyle as any}
-                                animate={index === currentIndex ? cardControls : undefined}
-                                drag={index === currentIndex && !isShuffling ? true : false}
-                                dragConstraints={deckRef}
-                                onDragEnd={(_, info) => {
-                                    const velocity = 500;
-                                    if (info.offset.x > 100 || info.velocity.x > velocity) {
-                                        handlePreviousCard();
-                                    } else if (info.offset.x < -100 || info.velocity.x < -velocity) {
-                                        handleNextCard();
-                                    } else {
-                                        cardControls.start({
-                                            x: 0,
-                                            rotate: 0,
-                                            transition: { type: 'spring', stiffness: 500, damping: 30 }
-                                        });
-                                    }
-                                }}
-                            >
-                                {/* Card content */}
-                                <div className="absolute inset-0">
-                                    {/* Video Background */}
-                                    <div className="relative w-full h-full">
-                                        <video
-                                            ref={el => videoRefs.current[reel.id] = el}
-                                            src={reel.videoUrl}
-                                            poster={reel.thumbnailUrl}
-                                            className="w-full h-full object-cover"
-                                            playsInline
-                                            loop
-                                            muted={isMuted}
+                                {/* Loading placeholder with thumbnail */}
+                                {isLoading && (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                        <div
+                                            className="w-full h-full bg-cover bg-center blur-sm"
+                                            style={{ backgroundImage: `url(${reel.thumbnailUrl})` }}
                                         />
-
-                                        {/* Gradient overlay */}
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-
-                                        {/* Background color fallback */}
-                                        <div className={`absolute inset-0 bg-gradient-to-br ${reel.color} opacity-80 mix-blend-overlay`} />
-                                    </div>
-
-                                    {/* Card Content Overlay */}
-                                    <div className="absolute inset-0 p-4 md:p-6 flex flex-col justify-between">
-                                        {/* Top bar with tag and duration */}
-                                        <div className="flex justify-between items-start">
-                                            <div className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs">
-                                                {reel.tags[0]}
-                                            </div>
-
-                                            <div className="flex space-x-2">
-                                                <div className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs flex items-center">
-                                                    {reel.duration}
-                                                </div>
-
-                                                <div className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs flex items-center">
-                                                    {reel.views}
-                                                </div>
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="w-16 h-16 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center">
+                                                <motion.div
+                                                    className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full"
+                                                    animate={{ rotate: 360 }}
+                                                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                                                />
                                             </div>
                                         </div>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div
+                                className="w-full h-full bg-cover bg-center"
+                                style={{ backgroundImage: `url(${reel.thumbnailUrl})` }}
+                            />
+                        )}
 
-                                        {/* Bottom content */}
-                                        <div>
-                                            {/* Instructor info */}
-                                            <div className="mb-2 flex items-center">
-                                                <div className="w-8 h-8 rounded-full bg-white/20 mr-2 flex items-center justify-center text-xs font-bold">
-                                                    {reel.instructor.charAt(0)}
-                                                </div>
-                                                <span className="text-sm">{reel.instructor}</span>
+                        {/* Visual gradient overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+
+                        {/* Colored overlay */}
+                        <div className={`absolute inset-0 bg-gradient-to-br ${reel.color} opacity-40 mix-blend-overlay`} />
+                    </div>
+
+                    {/* Card content overlay - only for current card */}
+                    {isCurrentCard && (
+                        <div className="absolute inset-0 p-4 md:p-6 flex flex-col justify-between">
+                            {/* Top bar with tag and duration */}
+                            <div className={`flex justify-between items-start transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0'}`}>
+                                <div className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs">
+                                    {reel.tags[0]}
+                                </div>
+
+                                <div className="flex space-x-2">
+                                    <div className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs flex items-center">
+                                        {reel.duration}
+                                    </div>
+                                    <div className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs flex items-center">
+                                        {reel.views}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Bottom content */}
+                            <div>
+                                {/* Info panel */}
+                                <AnimatePresence>
+                                    {showInfo && (
+                                        <motion.div
+                                            className="absolute inset-0 bg-black/80 backdrop-blur-sm p-6 flex flex-col justify-between z-20"
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: 20 }}
+                                            transition={{ duration: 0.3 }}
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <h3 className="text-2xl font-bold">{reel.title}</h3>
+                                                <motion.button
+                                                    className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"
+                                                    onClick={toggleInfo}
+                                                    whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
+                                                    whileTap={{ scale: 0.9 }}
+                                                >
+                                                    ✕
+                                                </motion.button>
                                             </div>
 
-                                            {/* Title and description */}
-                                            <h3 className="text-2xl font-bold mb-1">{reel.title}</h3>
-                                            <p className="text-white/80 text-sm mb-4">{reel.subtitle}</p>
+                                            <div className="my-4 overflow-auto max-h-[50vh]">
+                                                <p className="text-white/80 text-sm mb-4">{reel.subtitle}</p>
+                                                <p className="text-white/70 text-sm mb-4">
+                                                    This video explores key concepts in {reel.tags.join(', ')},
+                                                    providing valuable insights for both beginners and advanced learners.
+                                                </p>
 
-                                            {/* Tags */}
-                                            <div className="flex flex-wrap gap-2 mb-4">
-                                                {reel.tags.map((tag, i) => (
-                                                    <span key={i} className="text-xs bg-white/10 backdrop-blur-md px-2 py-1 rounded-full">
-                                                        {tag}
-                                                    </span>
-                                                ))}
+                                                <div className="flex flex-wrap gap-2 mb-4">
+                                                    {reel.tags.map((tag, i) => (
+                                                        <span key={i} className="text-xs bg-white/10 backdrop-blur-md px-2 py-1 rounded-full">
+                                                            {tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
                                             </div>
 
-                                            {/* Video controls */}
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex space-x-2">
-                                                    <motion.button
-                                                        className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center"
-                                                        whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
-                                                        whileTap={{ scale: 0.9 }}
-                                                        onClick={togglePlay}
-                                                    >
-                                                        {isPlaying ? <FaPause /> : <FaPlay />}
-                                                    </motion.button>
-
-                                                    <motion.button
-                                                        className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center"
-                                                        whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
-                                                        whileTap={{ scale: 0.9 }}
-                                                        onClick={toggleMute}
-                                                    >
-                                                        {isMuted ? <FaVolumeMute /> : <FaVolumeUp />}
-                                                    </motion.button>
+                                            <div>
+                                                <div className="mb-2 flex items-center">
+                                                    <div className="w-8 h-8 rounded-full bg-white/20 mr-2 flex items-center justify-center text-xs font-bold">
+                                                        {reel.instructor.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-sm block">{reel.instructor}</span>
+                                                        <span className="text-xs text-white/60">Expert Instructor</span>
+                                                    </div>
                                                 </div>
+
+                                                <motion.button
+                                                    className={`w-full py-3 bg-gradient-to-r ${reel.color} rounded-full text-sm flex items-center justify-center mt-4`}
+                                                    whileHover={{ scale: 1.03 }}
+                                                    whileTap={{ scale: 0.97 }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setShowInfo(false);
+                                                        setIsPlaying(true);
+                                                    }}
+                                                >
+                                                    <FaPlay className="mr-2 text-xs" /> Start Learning
+                                                </motion.button>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
+                                {/* Main card content (only visible when info panel is closed) */}
+                                {!showInfo && (
+                                    <div className={`transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0'}`}>
+                                        {/* Instructor info */}
+                                        <div className="mb-2 flex items-center">
+                                            <div className="w-8 h-8 rounded-full bg-white/20 mr-2 flex items-center justify-center text-xs font-bold">
+                                                {reel.instructor.charAt(0)}
+                                            </div>
+                                            <span className="text-sm">{reel.instructor}</span>
+                                        </div>
+
+                                        {/* Title and description */}
+                                        <h3 className="text-2xl font-bold mb-1">{reel.title}</h3>
+                                        <p className="text-white/80 text-sm mb-4">{reel.subtitle}</p>
+
+                                        {/* Tags */}
+                                        <div className="flex flex-wrap gap-2 mb-4">
+                                            {reel.tags.map((tag, i) => (
+                                                <span key={i} className="text-xs bg-white/10 backdrop-blur-md px-2 py-1 rounded-full">
+                                                    {tag}
+                                                </span>
+                                            ))}
+                                        </div>
+
+                                        {/* Video controls */}
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex space-x-2">
+                                                <motion.button
+                                                    className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center"
+                                                    whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
+                                                    whileTap={{ scale: 0.9 }}
+                                                    onClick={togglePlay}
+                                                >
+                                                    {isPlaying ? <FaPause /> : <FaPlay />}
+                                                </motion.button>
 
                                                 <motion.button
                                                     className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center"
                                                     whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
                                                     whileTap={{ scale: 0.9 }}
-                                                    onClick={toggleExpand}
+                                                    onClick={toggleMute}
                                                 >
-                                                    {isExpanded ? <FaCompress /> : <FaExpand />}
+                                                    {isMuted ? <FaVolumeMute /> : <FaVolumeUp />}
+                                                </motion.button>
+
+                                                <motion.button
+                                                    className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center"
+                                                    whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
+                                                    whileTap={{ scale: 0.9 }}
+                                                    onClick={toggleInfo}
+                                                >
+                                                    <FaInfo />
                                                 </motion.button>
                                             </div>
+
+                                            <motion.button
+                                                className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center"
+                                                whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
+                                                whileTap={{ scale: 0.9 }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    shuffleDeck();
+                                                }}
+                                            >
+                                                <FaRandom />
+                                            </motion.button>
                                         </div>
                                     </div>
-                                </div>
-                            </motion.div>
-                        );
-                    })}
-                </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
-                {/* Mobile swipe indicators (only show during active swipe) */}
-                {isMobile && isDragging && direction && (
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-50">
-                        <div className={`w-16 h-16 rounded-full bg-white/20 backdrop-blur-lg flex items-center justify-center ${direction === 'left' ? 'ml-auto mr-8' :
-                                direction === 'right' ? 'mr-auto ml-8' : ''
-                            }`}>
-                            {direction === 'left' && (
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                                    <path d="M9 18l6-6-6-6" />
-                                </svg>
-                            )}
-                            {direction === 'right' && (
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                    {/* Progress indicator for current card */}
+                    {isCurrentCard && (
+                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
+                            <motion.div
+                                className={`h-full bg-gradient-to-r ${reel.color}`}
+                                initial={{ width: "0%" }}
+                                animate={isPlaying && videoLoaded ? { width: "100%" } : { width: "0%" }}
+                                transition={isPlaying && videoLoaded ? {
+                                    duration: 30, // Assuming average video length
+                                    ease: "linear"
+                                } : { duration: 0 }}
+                            />
+                        </div>
+                    )}
+                </div>
+            </motion.div>
+        );
+    };
+
+    // Component structure
+    return (
+        <div
+            className="relative h-[500px] md:h-[600px]"
+            style={{ perspective: '1000px' }}
+        >
+            {/* First time user hint */}
+            {!isPlaying && !isTransitioning && !isShuffling && (
+                <motion.div
+                    className="absolute inset-0 z-40 pointer-events-none flex items-center justify-center"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 1, duration: 0.5 }}
+                >
+                    <motion.div
+                        className="px-6 py-3 bg-white/10 backdrop-blur-lg rounded-full text-center text-sm"
+                        animate={{
+                            y: [0, -10, 0],
+                        }}
+                        transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+                    >
+                        {isMobile ? 'Swipe to explore cards' : 'Click shuffle or use arrow keys'}
+                    </motion.div>
+                </motion.div>
+            )}
+
+            {/* Loading/Shuffling indicator */}
+            {(isShuffling || isTransitioning) && (
+                <motion.div
+                    className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                >
+                    <motion.div
+                        className="px-6 py-3 bg-black/50 backdrop-blur-lg rounded-full"
+                        animate={{ scale: [1, 1.05, 1] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                    >
+                        <span className="mr-2">{isShuffling ? 'Shuffling' : 'Loading'}</span>
+                        <motion.span
+                            animate={{ opacity: [0, 1, 0] }}
+                            transition={{ duration: 1.5, repeat: Infinity, repeatType: "loop" }}
+                        >
+                            ⚡
+                        </motion.span>
+                    </motion.div>
+                </motion.div>
+            )}
+
+            {/* Main container */}
+            <div
+                ref={deckRef}
+                className="relative w-full h-full flex items-center justify-center"
+                onClick={handleContainerClick}
+                {...swipeHandlers}
+            >
+                {/* Card container with 3D perspective */}
+                <div
+                    className="relative w-72 h-96 md:w-80 md:h-[450px]"
+                    style={{ transformStyle: 'preserve-3d' }}
+                >
+                    {/* Desktop-only navigation arrows */}
+                    {!isMobile && !isShuffling && !isTransitioning && (
+                        <div className={`transition-opacity duration-300 ${controlsVisible ? 'opacity-100' : 'opacity-0'}`}>
+                            <button
+                                className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1/2 z-30 w-12 h-12 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/10"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigateToReel('prev');
+                                }}
+                                style={{
+                                    zIndex: 30,
+                                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                                }}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <path d="M15 18l-6-6 6-6" />
                                 </svg>
-                            )}
+                            </button>
+
+                            <button
+                                className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-1/2 z-30 w-12 h-12 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/10"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigateToReel('next');
+                                }}
+                                style={{
+                                    zIndex: 30,
+                                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                                }}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M9 18l6-6-6-6" />
+                                </svg>
+                            </button>
                         </div>
-                    </div>
-                )}
+                    )}
+
+                    {/* Random shuffle button (top) */}
+                    {!isShuffling && !isTransitioning && (
+                        <motion.button
+                            className="absolute top-2 left-1/2 transform -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/10 text-sm"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                shuffleDeck();
+                            }}
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: controlsVisible ? 1 : 0, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.3 }}
+                            whileHover={{ scale: 1.05, backgroundColor: "rgba(0,0,0,0.6)" }}
+                            whileTap={{ scale: 0.95 }}
+                        >
+                            <FaRandom className="mr-2 text-xs" /> Shuffle Deck
+                        </motion.button>
+                    )}
+
+                    {/* Render all cards */}
+                    {reels.map((reel, index) => renderCard(reel, index))}
+
+                    {/* Mobile swipe hint (only show during swipe) */}
+                    {isMobile && (
+                        <div className="absolute inset-x-0 bottom-20 flex justify-center">
+                            <motion.div
+                                className="px-4 py-2 bg-black/40 backdrop-blur-sm rounded-full text-xs text-white/80"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: isTransitioning ? 1 : 0 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                {swipeDirection === 'left' ? 'Next card' : swipeDirection === 'right' ? 'Previous card' : ''}
+                            </motion.div>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* Card indicators */}
-            {!isExpanded && (
-                <div className="absolute bottom-4 left-0 right-0 flex justify-center z-20">
-                    <div className="flex space-x-2">
-                        {reels.map((_, i) => (
-                            <motion.div
-                                key={i}
-                                className={`w-2 h-2 rounded-full ${i === currentIndex ? 'bg-white' : 'bg-white/30'}`}
-                                whileHover={{ scale: 1.5 }}
-                                onClick={() => {
-                                    if (!isShuffling) {
-                                        setPreviousIndex(currentIndex);
-                                        setCurrentIndex(i);
-                                    }
-                                }}
-                            />
-                        ))}
-                    </div>
+            {/* Card pagination indicators */}
+            <div className="absolute bottom-4 left-0 right-0 flex justify-center z-20">
+                <div className="flex space-x-2">
+                    {reels.map((_, i) => (
+                        <motion.button
+                            key={i}
+                            className="w-2 h-2 rounded-full focus:outline-none"
+                            style={{
+                                backgroundColor: i === currentIndex ? 'white' : 'rgba(255, 255, 255, 0.3)',
+                                boxShadow: i === currentIndex ? '0 0 8px rgba(255, 255, 255, 0.5)' : 'none'
+                            }}
+                            whileHover={{ scale: 1.5 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isTransitioning && !isShuffling && i !== currentIndex) {
+                                    // Determine direction to navigate
+                                    const direction = i > currentIndex ? 'next' : 'prev';
+                                    setCurrentIndex(i);
+                                    setSwipeDirection(direction === 'next' ? 'left' : 'right');
+                                    setIsTransitioning(true);
+
+                                    // Reset after animation
+                                    setTimeout(() => {
+                                        setIsTransitioning(false);
+                                        setSwipeDirection(null);
+                                        setIsPlaying(true);
+                                    }, 300);
+                                }
+                            }}
+                        />
+                    ))}
                 </div>
-            )}
+            </div>
         </div>
     );
 }
