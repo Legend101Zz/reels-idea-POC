@@ -3,41 +3,63 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import { FaSearch, FaBell, FaChevronRight, FaPlay, FaArrowUp, FaArrowDown, FaArrowLeft, FaArrowRight, FaUsers, FaClock, FaStar, FaCompass, FaGraduationCap, FaRegLightbulb, FaBrain } from 'react-icons/fa';
+import { FaSearch, FaBell, FaChevronRight, FaPlay, FaArrowUp, FaArrowDown, FaArrowLeft, FaArrowRight, FaUsers, FaClock, FaStar, FaCompass, FaGraduationCap, FaRegLightbulb, FaBrain, FaInfinity, FaRandom, FaShareAlt } from 'react-icons/fa';
 import ReelsDeck from '@/components/ReelsDeck';
 import { deckReels } from '@/data/deckReels';
 
-// Enhanced trending cards with more detailed data
-const trendingCards = [
+// Enhanced trending reels with more detailed data
+const trendingReels = [
   {
-    id: 'card1',
+    id: 'reel1',
     title: 'Black Holes Explained',
-    subtitle: 'Learn How To Escape With Relativity (Or Not!)',
+    subtitle: 'Mind-bending concepts in 60 seconds',
     color: 'from-[#8f46c1] to-[#a0459b]',
     image: '/test.jpeg',
     author: 'Dr. Alex Chen',
     views: '12.5k',
-    duration: '8 min'
+    duration: '60 sec'
   },
   {
-    id: 'card2',
+    id: 'reel2',
     title: 'Inner Peace',
-    subtitle: 'Mastering The Concept Of Daily Meditation',
+    subtitle: 'Quick meditation technique to try now',
     color: 'from-[#a0459b] to-[#bd4580]',
     image: '/test.jpeg',
     author: 'Maya Wilson',
     views: '9.8k',
-    duration: '5 min'
+    duration: '45 sec'
   },
   {
-    id: 'card3',
+    id: 'reel3',
     title: 'Quantum Physics',
-    subtitle: 'Understanding The Building Blocks Of Reality',
+    subtitle: 'Wave-particle duality simplified',
     color: 'from-[#bd4580] to-[#d56f66]',
     image: '/test.jpeg',
     author: 'Prof. James Liu',
     views: '11.2k',
-    duration: '7 min'
+    duration: '55 sec'
+  }
+];
+
+// Platform features with enhanced design
+const platformFeatures = [
+  {
+    title: "Bite-sized Learning",
+    description: "Master complex topics in 60-second looping clips",
+    icon: <FaClock className="text-2xl" />,
+    color: "from-[#8f46c1] to-[#a0459b]"
+  },
+  {
+    title: "Infinite Loops",
+    description: "Clips automatically loop for better retention",
+    icon: <FaInfinity className="text-2xl" />,
+    color: "from-[#a0459b] to-[#bd4580]"
+  },
+  {
+    title: "Smart Sharing",
+    description: "Share knowledge clips with friends and study groups",
+    icon: <FaShareAlt className="text-2xl" />,
+    color: "from-[#bd4580] to-[#d56f66]"
   }
 ];
 
@@ -47,25 +69,25 @@ const categories = [
     name: "Physics",
     color: "from-[#8f46c1] to-[#a0459b]",
     icon: "🔭",
-    courses: 42
+    clips: 42
   },
   {
     name: "History",
     color: "from-[#a0459b] to-[#bd4580]",
     icon: "📜",
-    courses: 38
+    clips: 38
   },
   {
     name: "Psychology",
     color: "from-[#bd4580] to-[#c85975]",
     icon: "🧠",
-    courses: 27
+    clips: 27
   },
   {
     name: "Technology",
     color: "from-[#c85975] to-[#d56f66]",
     icon: "💻",
-    courses: 64
+    clips: 64
   }
 ];
 
@@ -187,8 +209,8 @@ export default function HomePage() {
     }).then(() => {
       setCurrentCardIndex((prev) =>
         direction === 'left'
-          ? (prev + 1) % trendingCards.length
-          : (prev - 1 + trendingCards.length) % trendingCards.length
+          ? (prev + 1) % trendingReels.length
+          : (prev - 1 + trendingReels.length) % trendingReels.length
       );
       cardsControls.set({ x: 0, opacity: 1 });
       setSwipeDirection(null);
@@ -358,10 +380,10 @@ export default function HomePage() {
             transition={{ delay: 0.6 }}
           >
             <span className="block mb-2">
-              Learn with Joy,
+              Short, Looping Clips
             </span>
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#8f46c1] to-[#d56f66]">
-              Scroll with Purpose
+              That Make You Smarter
             </span>
           </motion.h2>
           <motion.p
@@ -370,7 +392,7 @@ export default function HomePage() {
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.8 }}
           >
-            Transform mindless scrolling into effortless learning with our multi-dimensional content experience.
+            KnowScroll is a video-sharing platform for educational content that transforms complex topics into bite-sized, looping clips that stick in your mind.
           </motion.p>
 
           <motion.div
@@ -385,7 +407,7 @@ export default function HomePage() {
                 whileHover={{ scale: 1.05, boxShadow: "0 10px 25px -5px rgba(143, 70, 193, 0.4)" }}
                 whileTap={{ scale: 0.98 }}
               >
-                <span>Start Exploring</span>
+                <span>Start Scrolling</span>
                 <motion.span
                   initial={{ x: 0, opacity: 0 }}
                   whileHover={{ x: 5, opacity: 1 }}
@@ -407,6 +429,47 @@ export default function HomePage() {
           </motion.div>
         </motion.section>
 
+        {/* Platform Features Section */}
+        <motion.section
+          variants={containerVariants}
+          initial="hidden"
+          animate={isLoaded ? "visible" : "hidden"}
+          className="mb-16"
+        >
+          <motion.div
+            variants={itemVariants}
+            className="flex justify-between items-center mb-8"
+          >
+            <div className="flex items-center">
+              <div className="w-6 h-6 bg-gradient-to-r from-[#8f46c1] to-[#d56f66] rounded-full flex items-center justify-center mr-2">
+                <FaPlay className="text-xs text-white" />
+              </div>
+              <h3 className="text-xl font-bold">What Makes KnowScroll Special</h3>
+            </div>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {platformFeatures.map((feature, i) => (
+              <motion.div
+                key={i}
+                variants={itemVariants}
+                className={`bg-gradient-to-br ${feature.color} bg-opacity-20 rounded-xl p-6 border border-white/10 hover:border-white/20 transition-colors`}
+                whileHover={{
+                  y: -5,
+                  boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3)",
+                  backgroundColor: "rgba(255, 255, 255, 0.08)"
+                }}
+              >
+                <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center mb-4">
+                  {feature.icon}
+                </div>
+                <h4 className="text-xl font-semibold mb-2">{feature.title}</h4>
+                <p className="text-white/70">{feature.description}</p>
+              </motion.div>
+            ))}
+          </div>
+        </motion.section>
+
         {/* ReelsDeck Section */}
         <motion.section
           variants={containerVariants}
@@ -420,11 +483,9 @@ export default function HomePage() {
           >
             <div className="flex items-center">
               <div className="w-6 h-6 bg-gradient-to-r from-[#8f46c1] to-[#d56f66] rounded-full flex items-center justify-center mr-2">
-                <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M13 17l5-5-5-5M6 17l5-5-5-5" />
-                </svg>
+                <FaRandom className="text-xs text-white" />
               </div>
-              <h3 className="text-xl font-bold">Knowledge Cards</h3>
+              <h3 className="text-xl font-bold">Trending Loops</h3>
             </div>
             <Link href="/feed">
               <motion.div
@@ -458,10 +519,10 @@ export default function HomePage() {
               <h2 className="text-2xl md:text-3xl font-bold mb-2">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#8f46c1] to-[#d56f66]">
                   Multi-Dimensional
-                </span> Navigation
+                </span> Video Navigation
               </h2>
               <p className="text-white/70 max-w-xl mx-auto">
-                Move beyond linear content with our revolutionary navigation system
+                Our unique navigation system lets you explore looping clips in ways you've never seen before
               </p>
             </motion.div>
 
@@ -524,12 +585,12 @@ export default function HomePage() {
                           <FaRegLightbulb className="text-xl" />
                         </div>
                         <h2 className="text-2xl md:text-3xl font-bold">
-                          Guilt-Free <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#8f46c1] to-[#d56f66]">Scrolling</span>
+                          Loops That <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#8f46c1] to-[#d56f66]">Teach</span>
                         </h2>
                       </div>
 
                       <p className="text-white/70 mb-8 text-lg">
-                        Transform idle time into knowledge growth. Every swipe becomes a meaningful learning moment.
+                        Our short, looping clips turn mindless scrolling into meaningful learning moments. Each loop reinforces concepts for better retention.
                       </p>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -558,7 +619,7 @@ export default function HomePage() {
                         whileHover={{ scale: 1.05, boxShadow: "0 10px 25px -5px rgba(143, 70, 193, 0.4)" }}
                         whileTap={{ scale: 0.95 }}
                       >
-                        Start Your Journey
+                        Start Looping
                       </motion.button>
                     </motion.div>
                   </div>
@@ -614,7 +675,7 @@ export default function HomePage() {
                 <div className="absolute bottom-0 inset-x-0 p-4">
                   <h4 className="font-semibold text-lg">{category.name}</h4>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-white/70">{category.courses} courses</span>
+                    <span className="text-xs text-white/70">{category.clips} video loops</span>
                     <motion.div
                       className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center"
                       whileHover={{ backgroundColor: "rgba(255,255,255,0.2)", scale: 1.1 }}
@@ -660,7 +721,7 @@ export default function HomePage() {
               <circle cx="12" cy="12" r="10" />
               <polygon points="10 8 16 12 10 16 10 8" />
             </svg>
-            <span className="text-xs mt-1">Feed</span>
+            <span className="text-xs mt-1">Loops</span>
           </motion.div>
         </Link>
 
@@ -753,6 +814,10 @@ function NavigationMethod({ title, description, direction, color, gradientFrom, 
             fill="#0A0A0A"
           />
 
+          {/* Video icon in center of screen */}
+          <circle cx="100" cy="90" r="5" fill={color} opacity="0.5" />
+          <rect x="95" y="85" width="10" height="10" rx="2" fill={color} opacity="0.8" />
+
           {/* Screen content based on direction */}
           {direction === "vertical" && (
             <>
@@ -771,7 +836,7 @@ function NavigationMethod({ title, description, direction, color, gradientFrom, 
                 transition={{ duration: 1.5, repeat: Infinity }}
               />
 
-              <rect x="80" y="70" width="40" height="60" rx="5" fill={color} opacity="0.8" />
+              <rect x="80" y="70" width="40" height="40" rx="5" fill={color} opacity="0.8" />
 
               <motion.path
                 d="M100 145 L100 165"
@@ -786,6 +851,44 @@ function NavigationMethod({ title, description, direction, color, gradientFrom, 
                 fill={color}
                 animate={{ y: isHovered ? [5, 0, 5] : 0 }}
                 transition={{ duration: 1.5, repeat: Infinity }}
+              />
+
+              {/* Loop indicator */}
+              <motion.circle
+                cx="100"
+                cy="130"
+                r="8"
+                stroke={color}
+                strokeWidth="2"
+                fill="none"
+                animate={{
+                  rotateY: isHovered ? 360 : 0
+                }}
+                style={{
+                  transformOrigin: "100px 130px"
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "linear"
+                }}
+              />
+              <motion.path
+                d="M100 122 L100 116"
+                stroke={color}
+                strokeWidth="2"
+                strokeLinecap="round"
+                animate={{
+                  rotateY: isHovered ? 360 : 0
+                }}
+                style={{
+                  transformOrigin: "100px 130px"
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "linear"
+                }}
               />
             </>
           )}
@@ -807,7 +910,7 @@ function NavigationMethod({ title, description, direction, color, gradientFrom, 
                 transition={{ duration: 1.5, repeat: Infinity }}
               />
 
-              <rect x="80" y="70" width="40" height="60" rx="5" fill={color} opacity="0.8" />
+              <rect x="80" y="70" width="40" height="40" rx="5" fill={color} opacity="0.8" />
 
               <motion.path
                 d="M155 100 L135 100"
@@ -822,6 +925,44 @@ function NavigationMethod({ title, description, direction, color, gradientFrom, 
                 fill={color}
                 animate={{ x: isHovered ? [5, 0, 5] : 0 }}
                 transition={{ duration: 1.5, repeat: Infinity }}
+              />
+
+              {/* Loop indicator */}
+              <motion.circle
+                cx="100"
+                cy="130"
+                r="8"
+                stroke={color}
+                strokeWidth="2"
+                fill="none"
+                animate={{
+                  rotateY: isHovered ? 360 : 0
+                }}
+                style={{
+                  transformOrigin: "100px 130px"
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "linear"
+                }}
+              />
+              <motion.path
+                d="M100 122 L100 116"
+                stroke={color}
+                strokeWidth="2"
+                strokeLinecap="round"
+                animate={{
+                  rotateY: isHovered ? 360 : 0
+                }}
+                style={{
+                  transformOrigin: "100px 130px"
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "linear"
+                }}
               />
             </>
           )}
@@ -874,6 +1015,43 @@ function NavigationMethod({ title, description, direction, color, gradientFrom, 
                 animate={{ opacity: isHovered ? [0.3, 0.8, 0.3] : 0.3 }}
                 transition={{ duration: 1.5, repeat: Infinity, delay: 0.6 }}
               />
+
+              {/* Loop indicators */}
+              <motion.circle
+                cx="70"
+                cy="140"
+                r="6"
+                stroke="white"
+                strokeWidth="1.5"
+                fill="none"
+                animate={{ rotate: isHovered ? 360 : 0 }}
+                style={{ transformOrigin: "70px 140px" }}
+                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+              />
+
+              <motion.circle
+                cx="100"
+                cy="140"
+                r="6"
+                stroke="white"
+                strokeWidth="1.5"
+                fill="none"
+                animate={{ rotate: isHovered ? 360 : 0 }}
+                style={{ transformOrigin: "100px 140px" }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
+              />
+
+              <motion.circle
+                cx="130"
+                cy="140"
+                r="6"
+                stroke="white"
+                strokeWidth="1.5"
+                fill="none"
+                animate={{ rotate: isHovered ? 360 : 0 }}
+                style={{ transformOrigin: "130px 140px" }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              />
             </>
           )}
 
@@ -903,7 +1081,7 @@ function ComparisonVisual() {
       <div className="absolute inset-0 flex flex-col md:flex-row">
         {/* Before Section */}
         <div className="h-1/2 md:h-full md:w-1/2 border-b md:border-b-0 md:border-r border-white/10 p-6 relative">
-          <div className="absolute top-2 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs">Before</div>
+          <div className="absolute top-2 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs">Standard Videos</div>
 
           <div className="flex flex-col h-full items-center justify-center">
             {/* Phone mockup with mindless scrolling */}
@@ -916,51 +1094,51 @@ function ComparisonVisual() {
                     animate={{ y: ["0%", "-70%", "0%"] }}
                     transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
                   >
-                    {/* Random content items */}
-                    {[...Array(8)].map((_, i) => (
+                    {/* Long video thumbnails */}
+                    {[...Array(5)].map((_, i) => (
                       <div
                         key={i}
-                        className="w-full py-2 px-2 border-b border-gray-800 flex items-center"
+                        className="w-full py-2 px-2 border-b border-gray-800"
                       >
-                        <div className="w-8 h-8 rounded-full bg-gray-800 mr-2 flex-shrink-0" />
-                        <div className="flex-1">
-                          <div className="h-2 w-24 bg-gray-800 rounded-full mb-1" />
-                          <div className="h-2 w-16 bg-gray-800 rounded-full" />
+                        <div className="w-full h-20 bg-gray-800 rounded-md mb-2">
+                          <div className="absolute right-4 bottom-4 px-2 py-0.5 text-[8px] bg-gray-900 rounded">
+                            10:35
+                          </div>
                         </div>
+                        <div className="h-2 w-24 bg-gray-800 rounded-full mb-1" />
+                        <div className="h-2 w-16 bg-gray-800 rounded-full" />
                       </div>
                     ))}
                   </motion.div>
                 </div>
               </div>
 
-              {/* Notification bubbles floating up */}
+              {/* Skip indicators */}
               <motion.div
                 className="absolute inset-x-0 bottom-0 h-full pointer-events-none"
                 initial={{ opacity: 1 }}
                 animate={{ opacity: 1 }}
               >
-                {[...Array(5)].map((_, i) => (
+                {[...Array(3)].map((_, i) => (
                   <motion.div
                     key={i}
-                    className="absolute w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center text-xs"
+                    className="absolute right-4 w-6 h-6 rounded-full bg-gray-800/80 flex items-center justify-center text-xs"
                     style={{
-                      left: `${20 + i * 12}%`,
-                      bottom: '10%'
+                      top: `${30 + i * 22}%`,
                     }}
-                    initial={{ y: 0, opacity: 0 }}
+                    initial={{ x: 0, opacity: 0 }}
                     animate={{
-                      y: -100 - i * 20,
+                      x: [0, 20, 0],
                       opacity: [0, 0.7, 0],
-                      x: i % 2 === 0 ? [0, 10, -5, 0] : [0, -10, 5, 0]
                     }}
                     transition={{
-                      duration: 3 + i * 0.5,
+                      duration: 2,
                       repeat: Infinity,
-                      delay: i * 0.8,
-                      ease: "easeOut"
+                      delay: i * 3,
+                      ease: "easeInOut"
                     }}
                   >
-                    <span>+1</span>
+                    <span>&gt;&gt;</span>
                   </motion.div>
                 ))}
               </motion.div>
@@ -975,58 +1153,61 @@ function ComparisonVisual() {
               }}
               transition={{ duration: 2, repeat: Infinity }}
             >
-              <FaClock className="mr-2 text-red-400" /> 2.5 hours wasted daily
+              <FaClock className="mr-2 text-red-400" /> Low knowledge retention
             </motion.div>
           </div>
         </div>
 
         {/* After Section */}
         <div className="h-1/2 md:h-full md:w-1/2 p-6 relative">
-          <div className="absolute top-2 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs">After</div>
+          <div className="absolute top-2 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs">KnowScroll Loops</div>
 
           <div className="flex flex-col h-full items-center justify-center">
             {/* Phone mockup with KnowScroll */}
             <div className="relative w-36 h-64 md:w-40 md:h-72 bg-black rounded-3xl border-4 border-gray-800 overflow-hidden">
               <div className="absolute inset-2 rounded-2xl bg-gradient-to-br from-[#0c0612] to-[#1a1522] overflow-hidden">
-                {/* Educational content mockup */}
-                <div className="absolute inset-0 overflow-hidden">
+                {/* Looping clip mockup */}
+                <div className="absolute inset-0 flex items-center justify-center">
                   <motion.div
-                    className="relative w-full h-full"
-                    animate={{ y: ["0%", "-60%", "0%"] }}
-                    transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+                    className="w-full h-full"
+                    animate={{ opacity: [0.8, 1, 0.8] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                   >
-                    {/* Educational content cards */}
-                    {[...Array(4)].map((_, i) => {
-                      const colors = [
-                        "from-[#8f46c1] to-[#a0459b]",
-                        "from-[#a0459b] to-[#bd4580]",
-                        "from-[#bd4580] to-[#d56f66]",
-                        "from-[#8f46c1] to-[#d56f66]"
-                      ];
+                    <div className="w-full h-full bg-gradient-to-br from-[#8f46c1] to-[#d56f66] opacity-60" />
 
-                      return (
-                        <div
-                          key={i}
-                          className="w-full h-full py-2 px-2 flex flex-col justify-end"
-                          style={{ height: '100%' }}
+                    {/* Center content */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
+                      <motion.div
+                        className="w-12 h-12 rounded-full bg-white/20 mb-4 flex items-center justify-center"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                      >
+                        <motion.div
+                          className="w-10 h-10 rounded-full border-2 border-white"
+                          animate={{ scale: [1, 1.1, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        />
+                      </motion.div>
+
+                      <div className="text-sm font-bold mb-1">Black Holes</div>
+                      <div className="text-xs mb-2">Event Horizon Explained</div>
+
+                      {/* Loop indicator */}
+                      <motion.div
+                        className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs flex items-center mt-2"
+                        animate={{ scale: [1, 1.05, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                          className="mr-1"
                         >
-                          <div className={`w-full h-3/4 rounded-xl bg-gradient-to-br ${colors[i]} p-2 flex flex-col justify-between`}>
-                            <div className="flex justify-between items-start">
-                              <div className="w-4 h-4 rounded-full bg-white/20" />
-                              <div className="w-8 h-2 rounded-full bg-white/20" />
-                            </div>
-
-                            <div>
-                              <div className="h-3 w-20 bg-white/30 rounded-full mb-1" />
-                              <div className="h-2 w-16 bg-white/20 rounded-full mb-3" />
-                              <div className="h-4 w-12 rounded-full bg-white/20 flex items-center justify-center">
-                                <div className="w-2 h-2 rounded-full bg-white"></div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                          ↻
+                        </motion.div>
+                        Looping (0:30)
+                      </motion.div>
+                    </div>
                   </motion.div>
                 </div>
 
@@ -1102,7 +1283,7 @@ function ComparisonVisual() {
               }}
               transition={{ duration: 2, repeat: Infinity }}
             >
-              <FaGraduationCap className="mr-2 text-green-400" /> 15 new concepts learned
+              <FaGraduationCap className="mr-2 text-green-400" /> Perfect for concept retention
             </motion.div>
           </div>
         </div>
