@@ -634,7 +634,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Categories Section */}
+        {/* Categories Section
         <motion.section
           variants={containerVariants}
           initial="hidden"
@@ -687,7 +687,7 @@ export default function HomePage() {
               </motion.div>
             ))}
           </div>
-        </motion.section>
+        </motion.section> */}
       </main>
 
       {/* Navigation */}
