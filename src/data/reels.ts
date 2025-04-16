@@ -8,7 +8,7 @@ export const reels: Reel[] = [
     description:
       "Part 1 of 5: Understanding what black holes are and how they form. Black holes are regions of spacetime where gravity is so strong that nothing—no particles or even electromagnetic radiation such as light—can escape from it.",
     videoUrl: "/videos/black-holes-1.mp4",
-    thumbnailUrl: "/images/black-holes-thumb.png",
+    thumbnailUrl: "/images/black-holes-thumb.jpg",
     duration: 60, // seconds
     views: 12500,
     likes: 3200,
@@ -33,7 +33,7 @@ export const reels: Reel[] = [
     description:
       "Part 2 of 5: The point of no return. The event horizon is the boundary defining the region of space around a black hole from which nothing can escape. Dive into the physics of this fascinating boundary.",
     videoUrl: "/videos/black-holes-1.mp4",
-    thumbnailUrl: "/images/black-holes-thumb-1.png",
+    thumbnailUrl: "/images/black-holes-thumb.jpg",
     duration: 65,
     views: 10200,
     likes: 2800,
@@ -58,7 +58,7 @@ export const reels: Reel[] = [
     description:
       "Part 3 of 5: What happens when you fall into a black hole. The extreme tidal forces around a black hole can stretch objects into long thin shapes, a process known as spaghettification.",
     videoUrl: "/videos/black-holes-1.mp4",
-    thumbnailUrl: "/images/black-holes-thumb-1.png",
+    thumbnailUrl: "/images/black-holes-thumb.jpg",
     duration: 70,
     views: 9500,
     likes: 2600,
@@ -75,7 +75,7 @@ export const reels: Reel[] = [
     description:
       "Part 4 of 5: Black holes aren't completely black after all. Explore Stephen Hawking's groundbreaking theory that black holes emit radiation and eventually evaporate.",
     videoUrl: "/videos/black-holes-1.mp4",
-    thumbnailUrl: "/images/black-holes-thumb-1.png",
+    thumbnailUrl: "/images/black-holes-thumb.jpg",
     duration: 68,
     views: 8800,
     likes: 2400,
@@ -92,7 +92,7 @@ export const reels: Reel[] = [
     description:
       "Part 5 of 5: Supermassive black holes and their role in galaxy formation. Most galaxies, including our Milky Way, have supermassive black holes at their centers.",
     videoUrl: "/videos/black-holes-1.mp4",
-    thumbnailUrl: "/images/black-holes-thumb-1.png",
+    thumbnailUrl: "/images/black-holes-thumb.jpg",
     duration: 72,
     views: 8200,
     likes: 2300,
@@ -110,8 +110,8 @@ export const reels: Reel[] = [
     title: "Quantum Physics: Wave-Particle Duality",
     description:
       "Part 1 of 3: The revolutionary concept that all particles exhibit both wave and particle properties. This counterintuitive idea is at the heart of quantum mechanics.",
-    videoUrl: "/videos/quantum-1.mp4",
-    thumbnailUrl: "/images/quantum-thumb-1.png",
+    videoUrl: "/videos/quantum-physics.mp4",
+    thumbnailUrl: "/images/quantum-thumb.jpg",
     duration: 62,
     views: 9800,
     likes: 2700,
@@ -127,8 +127,8 @@ export const reels: Reel[] = [
     title: "Quantum Physics: Superposition",
     description:
       "Part 2 of 3: Understanding how quantum objects can exist in multiple states simultaneously until measured. The famous Schrödinger's cat thought experiment illustrates this bizarre quantum effect.",
-    videoUrl: "/videos/quantum-1.mp4",
-    thumbnailUrl: "/images/quantum-thumb-1.png",
+    videoUrl: "/videos/quantum-physics.mp4",
+    thumbnailUrl: "/images/quantum-thumb.jpg",
     duration: 64,
     views: 9200,
     likes: 2500,
@@ -152,8 +152,8 @@ export const reels: Reel[] = [
     title: "Quantum Physics: Entanglement",
     description:
       "Part 3 of 3: The 'spooky action at a distance' that troubled Einstein. Quantum entanglement connects particles so that the quantum state of each particle cannot be described independently of the others.",
-    videoUrl: "/videos/quantum-1.mp4",
-    thumbnailUrl: "/images/quantum-thumb-1.png",
+    videoUrl: "/videos/quantum-physics.mp4",
+    thumbnailUrl: "/images/quantum-thumb.jpg",
     duration: 67,
     views: 8900,
     likes: 2400,
@@ -172,7 +172,7 @@ export const reels: Reel[] = [
     description:
       "The science behind light amplification by stimulated emission of radiation (LASER). Understand the basic principles that make lasers one of the most versatile tools in modern technology.",
     videoUrl: "/videos/lasers.mp4",
-    thumbnailUrl: "/images/lasers-thumb.png",
+    thumbnailUrl: "/images/lasers-thumb.jpg",
     duration: 55,
     views: 8700,
     likes: 2100,
@@ -192,8 +192,8 @@ export const reels: Reel[] = [
     title: "Lasers in Medicine",
     description:
       "An alternate view focusing on how lasers are used in surgical procedures, diagnostics, and treatments. Laser technology has revolutionized many medical fields.",
-    videoUrl: "/videos/lasers-medical.mp4",
-    thumbnailUrl: "/images/lasers-medical-thumb.png",
+    videoUrl: "/videos/lasers.mp4",
+    thumbnailUrl: "/images/lasers-thumb.jpg",
     duration: 58,
     views: 6200,
     likes: 1800,
@@ -213,8 +213,8 @@ export const reels: Reel[] = [
     title: "Lasers in Manufacturing",
     description:
       "An alternate view focusing on how lasers are used in cutting, welding, 3D printing, and other industrial applications. Lasers enable precision manufacturing at scales impossible with traditional tools.",
-    videoUrl: "/videos/lasers-industrial.mp4",
-    thumbnailUrl: "/images/lasers-industrial-thumb.png",
+    videoUrl: "/videos/lasers.mp4",
+    thumbnailUrl: "/images/lasers-thumb.jpg",
     duration: 62,
     views: 5900,
     likes: 1600,
@@ -234,8 +234,8 @@ export const reels: Reel[] = [
     title: "Quantum Laser Applications",
     description:
       "An alternate view exploring how lasers are used in quantum computing, quantum cryptography, and other cutting-edge quantum technologies.",
-    videoUrl: "/videos/lasers-quantum.mp4",
-    thumbnailUrl: "/images/lasers-quantum-thumb.png",
+    videoUrl: "/videos/lasers.mp4",
+    thumbnailUrl: "/images/lasers-thumb.jpg",
     duration: 60,
     views: 5200,
     likes: 1500,
@@ -258,7 +258,7 @@ export const reels: Reel[] = [
     description:
       "Learn how mindfulness practices affect brain structure and function. This research-backed exploration shows how meditation can literally change your brain.",
     videoUrl: "/videos/inner-peace.mp4",
-    thumbnailUrl: "/images/inner-peace-thumb.png",
+    thumbnailUrl: "/images/inner-peace-thumb.jpg",
     duration: 75,
     views: 15600,
     likes: 4200,
@@ -295,7 +295,7 @@ export const reels: Reel[] = [
     description:
       "Part 1 of 3: From a small settlement to the dominant Mediterranean power. Explore how Rome grew from humble beginnings to become one of history's greatest empires.",
     videoUrl: "/videos/ancient-rome.mp4",
-    thumbnailUrl: "/images/ancient-rome-thumb.png",
+    thumbnailUrl: "/images/ancient-rome-thumb.jpg",
     duration: 65,
     views: 12100,
     likes: 3400,
@@ -311,8 +311,8 @@ export const reels: Reel[] = [
     title: "Ancient Egypt: Land of Pharaohs",
     description:
       "Part 2 of 3: The civilization that flourished along the Nile for over 3,000 years. Discover the mysteries of pyramids, hieroglyphics, and the complex Egyptian pantheon.",
-    videoUrl: "/videos/ancient-egypt.mp4",
-    thumbnailUrl: "/images/ancient-egypt-thumb.png",
+    videoUrl: "/videos/ancient-rome.mp4",
+    thumbnailUrl: "/images/ancient-rome-thumb.jpg",
     duration: 68,
     views: 11800,
     likes: 3300,
@@ -336,8 +336,8 @@ export const reels: Reel[] = [
     title: "Ancient China: Dynasties and Innovations",
     description:
       "Part 3 of 3: The birthplace of numerous technologies and philosophical traditions. Explore how ancient Chinese innovations like paper, printing, and gunpowder changed the world.",
-    videoUrl: "/videos/ancient-china.mp4",
-    thumbnailUrl: "/images/ancient-china-thumb.png",
+    videoUrl: "/videos/ancient-rome.mp4",
+    thumbnailUrl: "/images/ancient-rome-thumb.jpg",
     duration: 70,
     views: 11200,
     likes: 3100,
@@ -355,8 +355,8 @@ export const reels: Reel[] = [
     title: "The AI Revolution: An Introduction",
     description:
       "An overview of artificial intelligence, its history, and how it's transforming our world. Understand the basic concepts behind this revolutionary technology.",
-    videoUrl: "/videos/ai-intro.mp4",
-    thumbnailUrl: "/images/ai-intro-thumb.png",
+    videoUrl: "/videos/ai-revolution.mp4",
+    thumbnailUrl: "/images/ai-revolution-thumb.jpg",
     duration: 60,
     views: 14500,
     likes: 3800,
@@ -381,8 +381,8 @@ export const reels: Reel[] = [
     title: "The Ethics of Artificial Intelligence",
     description:
       "An alternate perspective exploring the ethical considerations, biases, and societal impacts of AI systems. How do we ensure AI benefits humanity?",
-    videoUrl: "/videos/ai-ethics.mp4",
-    thumbnailUrl: "/images/ai-ethics-thumb.png",
+    videoUrl: "/videos/ai-revolution.mp4",
+    thumbnailUrl: "/images/ai-revolution-thumb.jpg",
     duration: 63,
     views: 12200,
     likes: 3500,
@@ -402,8 +402,8 @@ export const reels: Reel[] = [
     title: "The Future of AI: What's Next?",
     description:
       "An alternate perspective examining emerging AI technologies and where the field is headed. From AGI to brain-computer interfaces, what does the future hold?",
-    videoUrl: "/videos/ai-future.mp4",
-    thumbnailUrl: "/images/ai-future-thumb.png",
+    videoUrl: "/videos/ai-revolution.mp4",
+    thumbnailUrl: "/images/ai-revolution-thumb.jpg",
     duration: 65,
     views: 13800,
     likes: 3700,
@@ -423,8 +423,8 @@ export const reels: Reel[] = [
     title: "Real-World AI Applications",
     description:
       "An alternate perspective showcasing practical AI applications in healthcare, transportation, education, and entertainment. How is AI being used today?",
-    videoUrl: "/videos/ai-applications.mp4",
-    thumbnailUrl: "/images/ai-applications-thumb.png",
+    videoUrl: "/videos/ai-revolution.mp4",
+    thumbnailUrl: "/images/ai-revolution-thumb.jpg",
     duration: 62,
     views: 11900,
     likes: 3200,

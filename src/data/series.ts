@@ -6,7 +6,7 @@ export const series: Series[] = [
     title: "Black Holes",
     description:
       "A comprehensive exploration of black holes and their properties",
-    thumbnailUrl: "/images/black-holes-series.png",
+    thumbnailUrl: "/images/black-holes-thumb.jpg",
     episodeCount: 5,
     userId: "user1",
     tags: ["physics", "space", "astronomy", "education"],
@@ -17,7 +17,7 @@ export const series: Series[] = [
     id: "series2",
     title: "The History of Civilization",
     description: "From ancient times to the modern era",
-    thumbnailUrl: "/images/history-series.png",
+    thumbnailUrl: "/images/ancient-rome-thumb.jpg",
     episodeCount: 12,
     userId: "user2",
     tags: ["history", "civilization", "education"],

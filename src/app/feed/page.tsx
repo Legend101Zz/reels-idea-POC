@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaHome, FaPlay, FaPlus, FaUser, FaCompass, FaQuestion } from 'react-icons/fa';
+import Link from 'next/link';
 import ReelPlayer from '@/components/ReelPlayer';
 import ThreadView from '@/components/ThreadView';
 import NavigationGuide from '@/components/NavigationGuide';
@@ -134,6 +135,12 @@ export default function FeedPage() {
         }
     };
 
+    // Navigation button classes for consistent styling
+    const navButtonClasses = "flex flex-col items-center justify-center w-16";
+    const navButtonActiveClasses = "text-primary-light";
+    const navButtonInactiveClasses = "text-white/80";
+    const navTextClasses = "text-xs mt-1";
+
     return (
         <div className="h-screen w-full bg-background relative overflow-hidden">
             {/* Loading Overlay */}
@@ -202,71 +209,98 @@ export default function FeedPage() {
                 </motion.button>
             )}
 
-            {/* Bottom Navigation */}
+            {/* Bottom Navigation with Links */}
             <div className="absolute bottom-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-md border-t border-white/5 flex items-center justify-around z-30">
-                <motion.button
-                    className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                >
-                    <FaHome className="text-xl mb-1 text-white/80" />
-                    <span className="text-xs text-white/60">Home</span>
-                </motion.button>
-
-                <motion.button
-                    className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                >
-                    <FaCompass className="text-xl mb-1 text-white/80" />
-                    <span className="text-xs text-white/60">Explore</span>
-                </motion.button>
-
-                <motion.button
-                    className="flex flex-col items-center justify-center -mt-8"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                >
+                <Link href="/" className="block">
                     <motion.div
-                        className="w-14 h-14 rounded-full bg-gradient-to-r from-primary to-primary-secondary flex items-center justify-center shadow-lg shadow-primary/20"
-                        whileHover={{ boxShadow: "0 0 20px rgba(143, 70, 193, 0.4)" }}
+                        className={navButtonClasses}
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
                     >
-                        <FaPlus className="text-xl" />
+                        <FaHome className={`text-xl mb-1 ${navButtonInactiveClasses}`} />
+                        <span className={`${navTextClasses} text-white/60`}>Home</span>
                     </motion.div>
-                </motion.button>
+                </Link>
 
-                <motion.button
-                    className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                >
-                    <div className="relative">
-                        <FaPlay className="text-xl mb-1 text-primary" />
-                        <motion.div
-                            className="absolute -top-1 -right-1 w-2 h-2 bg-primary-secondary rounded-full"
-                            animate={{ scale: [1, 1.2, 1] }}
-                            transition={{ duration: 2, repeat: Infinity }}
-                        />
-                    </div>
-                    <span className="text-xs text-primary-light">Feed</span>
-                </motion.button>
+                <Link href="/explore" className="block">
+                    <motion.div
+                        className={navButtonClasses}
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                    >
+                        <FaCompass className={`text-xl mb-1 ${navButtonInactiveClasses}`} />
+                        <span className={`${navTextClasses} text-white/60`}>Explore</span>
+                    </motion.div>
+                </Link>
 
-                <motion.button
-                    className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                >
-                    <div className="relative">
-                        <FaUser className="text-xl mb-1 text-white/80" />
+                <Link href="/create" className="block">
+                    <motion.div
+                        className="flex flex-col items-center justify-center -mt-8 relative"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                    >
                         <motion.div
-                            className="absolute -top-1 -right-1 w-2 h-2 bg-primary-secondary rounded-full"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 2 }}
+                            className="w-14 h-14 rounded-full bg-gradient-to-r from-primary to-primary-secondary flex items-center justify-center shadow-lg shadow-primary/20"
+                            whileHover={{
+                                boxShadow: "0 0 20px rgba(143, 70, 193, 0.4)",
+                                scale: 1.05
+                            }}
+                        >
+                            <FaPlus className="text-xl" />
+                        </motion.div>
+
+                        {/* Pulsing effect around the button */}
+                        <motion.div
+                            className="absolute inset-0 rounded-full border-2 border-primary/50"
+                            animate={{
+                                scale: [1, 1.15, 1],
+                                opacity: [0.5, 0, 0.5],
+                            }}
+                            transition={{
+                                duration: 2,
+                                repeat: Infinity,
+                                repeatType: "loop",
+                            }}
                         />
-                    </div>
-                    <span className="text-xs text-white/60">Profile</span>
-                </motion.button>
+                    </motion.div>
+                </Link>
+
+                <Link href="/feed" className="block">
+                    <motion.div
+                        className={navButtonClasses}
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                    >
+                        <div className="relative">
+                            <FaPlay className={`text-xl mb-1 ${navButtonActiveClasses}`} />
+                            <motion.div
+                                className="absolute -top-1 -right-1 w-2 h-2 bg-primary-secondary rounded-full"
+                                animate={{ scale: [1, 1.2, 1] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                            />
+                        </div>
+                        <span className={`${navTextClasses} ${navButtonActiveClasses}`}>Feed</span>
+                    </motion.div>
+                </Link>
+
+                <Link href="/profile" className="block">
+                    <motion.div
+                        className={navButtonClasses}
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                    >
+                        <div className="relative">
+                            <FaUser className={`text-xl mb-1 ${navButtonInactiveClasses}`} />
+                            <motion.div
+                                className="absolute -top-1 -right-1 w-2 h-2 bg-primary-secondary rounded-full"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 2 }}
+                            />
+                        </div>
+                        <span className={`${navTextClasses} text-white/60`}>Profile</span>
+                    </motion.div>
+                </Link>
             </div>
 
             {/* Thread Modal */}
@@ -336,7 +370,7 @@ export default function FeedPage() {
                             </div>
                             <motion.button
                                 className="px-4 py-2 bg-gradient-to-r from-primary to-primary-secondary rounded-full text-sm"
-                                whileHover={{ scale: 1.05 }}
+                                whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(143, 70, 193, 0.4)" }}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => setIsFirstVisit(false)}
                             >
