@@ -3,7 +3,7 @@
 //@ts-nocheck
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -11,7 +11,7 @@ import {
     FaVolumeMute, FaPause, FaPlay, FaInfoCircle, FaKeyboard,
     FaArrowUp, FaArrowDown, FaArrowLeft, FaArrowRight, FaBookmark
 } from 'react-icons/fa';
-import { Reel, WhatIfScenario } from '@/types';
+import { Reel } from '@/types';
 import { reels } from '@/data/reels';
 import { users } from '@/data/users';
 import EpisodeIndicator from '@/components/EpisodeIndicator';
@@ -65,28 +65,59 @@ export default function ReelPlayer({
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Preloading refs (keep videos in memory for instant playback)
-    const preloadRefs = useRef<Record<string, HTMLVideoElement>>({});
+    // Advanced preloading state
+    const videoCache = useRef(new Map<string, HTMLVideoElement>());
+    const preloadQueue = useRef<string[]>([]);
+    const maxPreloadedVideos = 10; // Limit the number of preloaded videos to avoid memory issues
 
-    // Find current reel from mock data and preload adjacent reels
-    useEffect(() => {
-        const reel = reels.find(r => r.id === initialReelId);
+    // Memoize preloading function for better performance
+    const preloadVideo = useCallback((reelId: string, priority: 'high' | 'low' = 'low') => {
+        // Skip if already in cache
+        if (videoCache.current.has(reelId)) return;
+
+        const reel = reels.find(r => r.id === reelId);
         if (!reel) return;
 
-        // Set the current reel and notify parent
-        setCurrentReel(reel);
-        if (onReelChange) {
-            onReelChange(reel.id);
+        // Create a new video element
+        const videoEl = document.createElement('video');
+        videoEl.src = reel.videoUrl;
+        videoEl.muted = true;
+        videoEl.preload = 'auto';
+        videoEl.playsInline = true;
+
+        // Force preloading - this improves loading time
+        videoEl.load();
+
+        // High priority preloads get played silently to load quickly then paused
+        if (priority === 'high') {
+            const playPromise = videoEl.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    videoEl.pause();
+                    videoEl.currentTime = 0;
+                }).catch(e => {
+                    console.warn("Preload play failed, still cached:", e);
+                });
+            }
         }
 
-        // Reset video state
-        setVideoEnded(false);
-        setVideoLoaded(false);
-        setProgress(0);
-        setIsLiked(false);
-        setIsSaved(false);
+        // Store in cache
+        videoCache.current.set(reelId, videoEl);
 
-        // Find adjacent reels for preloading and navigation hints
+        // Add to queue for LRU tracking
+        preloadQueue.current.push(reelId);
+
+        // Remove oldest if we exceed our cache limit
+        if (preloadQueue.current.length > maxPreloadedVideos) {
+            const oldestReelId = preloadQueue.current.shift();
+            if (oldestReelId && oldestReelId !== currentReel?.id) {
+                videoCache.current.delete(oldestReelId);
+            }
+        }
+    }, [currentReel]);
+
+    // Find adjacent reels and update navigation state
+    const updateAdjacentReels = useCallback((reel: Reel) => {
         const adjacentReels: { up?: Reel; down?: Reel; left?: Reel; right?: Reel } = {};
 
         // VERTICAL NAVIGATION - STRICTLY WITHIN SERIES
@@ -110,13 +141,10 @@ export default function ReelPlayer({
 
                 // Preload ALL episodes in this series for instant navigation
                 seriesReels.forEach(seriesReel => {
-                    if (seriesReel.id !== reel.id && !preloadRefs.current[seriesReel.id]) {
-                        const preloadVideo = document.createElement('video');
-                        preloadVideo.src = seriesReel.videoUrl;
-                        preloadVideo.muted = true;
-                        preloadVideo.preload = 'auto';
-                        preloadVideo.load();
-                        preloadRefs.current[seriesReel.id] = preloadVideo;
+                    if (seriesReel.id !== reel.id) {
+                        // Higher priority for next episode
+                        const priority = seriesReel.id === adjacentReels.up?.id ? 'high' : 'low';
+                        preloadVideo(seriesReel.id, priority);
                     }
                 });
             }
@@ -136,6 +164,7 @@ export default function ReelPlayer({
             if (differentSeries.length > 0) {
                 // Take the first match for left navigation
                 adjacentReels.left = differentSeries[0];
+                preloadVideo(adjacentReels.left.id, 'high');
             }
         } else if (reel.alternateVersions && reel.alternateVersions.length > 0) {
             // If this is a HyperReel with alternates, use those for left/right
@@ -147,6 +176,7 @@ export default function ReelPlayer({
             const nextReel = reels.find(r => r.id === nextVersionId);
             if (nextReel) {
                 adjacentReels.left = nextReel;
+                preloadVideo(nextReel.id, 'high');
             }
 
             // Previous alternate version (right swipe)
@@ -155,6 +185,7 @@ export default function ReelPlayer({
             const prevReel = reels.find(r => r.id === prevVersionId);
             if (prevReel) {
                 adjacentReels.right = prevReel;
+                preloadVideo(prevReel.id, 'high');
             }
         }
 
@@ -168,6 +199,7 @@ export default function ReelPlayer({
 
             if (relatedReels.length > 0) {
                 adjacentReels.right = relatedReels[0];
+                preloadVideo(adjacentReels.right.id, 'high');
             }
         }
 
@@ -181,13 +213,40 @@ export default function ReelPlayer({
 
             if (relatedReels.length > 0) {
                 adjacentReels.left = relatedReels[0];
+                preloadVideo(adjacentReels.left.id, 'high');
             }
         }
 
         // Update navigation state
         setNextReels(adjacentReels);
 
-    }, [initialReelId, onReelChange]);
+    }, [preloadVideo]);
+
+    // Find current reel from mock data and preload adjacent reels
+    useEffect(() => {
+        const reel = reels.find(r => r.id === initialReelId);
+        if (!reel) return;
+
+        // Set the current reel and notify parent
+        setCurrentReel(reel);
+        if (onReelChange) {
+            onReelChange(reel.id);
+        }
+
+        // Reset video state
+        setVideoEnded(false);
+        setVideoLoaded(false);
+        setProgress(0);
+        setIsLiked(false);
+        setIsSaved(false);
+
+        // Preload the current video with highest priority
+        preloadVideo(reel.id, 'high');
+
+        // Find and preload adjacent reels
+        updateAdjacentReels(reel);
+
+    }, [initialReelId, onReelChange, preloadVideo, updateAdjacentReels]);
 
     // Check if we're on desktop
     useEffect(() => {
@@ -216,31 +275,25 @@ export default function ReelPlayer({
         }
     }, [showControls, showWhatIf, showInfo, showKeyboardHelp]);
 
-    // Handle video loading, events and instant transitions
+    // Handle efficient video loading and playback
     useEffect(() => {
         if (!videoRef.current || !currentReel) return;
 
         const video = videoRef.current;
 
-        // Set video properties
+        // Apply mute state
         video.muted = isMuted;
-        video.loop = true;
 
-        // Clear previous event listeners
-        const cloneNode = video.cloneNode(false) as HTMLVideoElement;
-        if (video.parentNode) {
-            video.parentNode.replaceChild(cloneNode, video);
-        }
-        videoRef.current = cloneNode;
+        // Set loop behavior
+        video.loop = true;
 
         // Setup event listeners
         const handleCanPlay = () => {
             setVideoLoaded(true);
-            setVideoDuration(cloneNode.duration);
+            setVideoDuration(video.duration);
 
             if (isPlaying && !isTransitioning) {
-                // Use Promise syntax for better error handling
-                cloneNode.play().catch(err => {
+                video.play().catch(err => {
                     console.error('Error playing video:', err);
                     setIsPlaying(false);
                 });
@@ -248,12 +301,12 @@ export default function ReelPlayer({
         };
 
         const handleLoadedMetadata = () => {
-            setVideoDuration(cloneNode.duration);
+            setVideoDuration(video.duration);
         };
 
         const handleTimeUpdate = () => {
-            const currentTime = cloneNode.currentTime;
-            const duration = cloneNode.duration;
+            const currentTime = video.currentTime;
+            const duration = video.duration;
 
             if (duration > 0) {
                 // Update progress percentage
@@ -269,111 +322,101 @@ export default function ReelPlayer({
             }
         };
 
-        const handleEnded = () => {
-            // Video has completed a loop, restarting
-            cloneNode.currentTime = 0;
-            cloneNode.play().catch(console.error);
-
-            if (!videoEnded) {
-                setVideoEnded(true);
-                if (onVideoComplete) {
-                    onVideoComplete();
-                }
-            }
-        };
-
-        const handleError = (e: Event) => {
+        const handleError = (e) => {
             console.error('Video error:', e);
             setVideoLoaded(false);
 
             // Try to recover with a default video if available
-            if (cloneNode.src !== '/videos/default-video.mp4') {
+            if (video.src !== '/videos/default-video.mp4') {
                 console.log('Attempting to play default video instead');
-                cloneNode.src = '/videos/default-video.mp4';
-                cloneNode.load();
+                video.src = '/videos/default-video.mp4';
+                video.load();
             }
         };
 
         // Add all event listeners
-        cloneNode.addEventListener('canplay', handleCanPlay);
-        cloneNode.addEventListener('loadedmetadata', handleLoadedMetadata);
-        cloneNode.addEventListener('timeupdate', handleTimeUpdate);
-        cloneNode.addEventListener('ended', handleEnded);
-        cloneNode.addEventListener('error', handleError);
+        video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('loadedmetadata', handleLoadedMetadata);
+        video.addEventListener('timeupdate', handleTimeUpdate);
+        video.addEventListener('error', handleError);
 
         // OPTIMIZED LOADING STRATEGY:
-        // Priority 1: Use preloaded video if available (instant playback)
-        // Priority 2: Set src and load if needed
-        const preloadedVideo = preloadRefs.current[currentReel.id];
+        // Use cached video if available (for instant playback)
+        const cachedVideo = videoCache.current.get(currentReel.id);
 
-        if (preloadedVideo && preloadedVideo.readyState >= 3) {
-            // Use the preloaded video's src - this is much faster than loading again
-            cloneNode.src = preloadedVideo.src;
+        if (cachedVideo) {
+            // If we have a cached version, use its source to avoid reloading
+            video.src = cachedVideo.src;
 
-            // If the preloaded video is fully loaded, we can set state immediately
-            if (preloadedVideo.readyState >= 4) {
+            // If the cached video is already loaded enough to play
+            if (cachedVideo.readyState >= 3) {
                 setVideoLoaded(true);
-                setVideoDuration(preloadedVideo.duration);
+                setVideoDuration(cachedVideo.duration || 0);
 
-                // Start playback immediately
+                // Start playing immediately
                 if (isPlaying && !isTransitioning) {
-                    cloneNode.play().catch(console.error);
+                    const playPromise = video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(err => {
+                            console.error('Error playing cached video:', err);
+                            setIsPlaying(false);
+                        });
+                    }
                 }
+            } else {
+                // If not loaded enough, we need to load
+                video.load();
             }
         } else {
-            // No preloaded version, load from scratch
-            cloneNode.src = currentReel.videoUrl;
-            cloneNode.load(); // Explicitly load to start buffering
+            // No cached version, load directly
+            video.src = currentReel.videoUrl;
+            video.load();
         }
 
         // Clean up function
         return () => {
-            cloneNode.removeEventListener('canplay', handleCanPlay);
-            cloneNode.removeEventListener('loadedmetadata', handleLoadedMetadata);
-            cloneNode.removeEventListener('timeupdate', handleTimeUpdate);
-            cloneNode.removeEventListener('ended', handleEnded);
-            cloneNode.removeEventListener('error', handleError);
+            // Remove event listeners
+            video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.removeEventListener('timeupdate', handleTimeUpdate);
+            video.removeEventListener('error', handleError);
 
-            if (!cloneNode.paused) {
-                cloneNode.pause();
-            }
-
-            // Store this video in preloadRefs if not already there
-            if (!preloadRefs.current[currentReel.id]) {
-                preloadRefs.current[currentReel.id] = cloneNode;
+            // Stop video if playing
+            if (!video.paused) {
+                video.pause();
             }
         };
     }, [currentReel, isMuted, isPlaying, isTransitioning, onVideoComplete, videoEnded]);
 
-    // Handle video play/pause state changes
+    // Handle play/pause state changes
     useEffect(() => {
         if (!videoRef.current || !videoLoaded || isTransitioning) return;
 
         const video = videoRef.current;
 
         if (isPlaying) {
-            video.play().catch(err => {
-                console.error('Error playing video:', err);
-                setIsPlaying(false);
-            });
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(err => {
+                    console.error('Error playing video:', err);
+                    setIsPlaying(false);
+                });
+            }
 
-            // Start progress tracking
+            // Progress tracking
             if (progressInterval.current) {
                 clearInterval(progressInterval.current);
             }
 
             progressInterval.current = setInterval(() => {
                 if (video) {
-                    const currentTime = video.currentTime;
-                    if (videoDuration > 0) {
-                        setProgress((currentTime / videoDuration) * 100);
-                    }
+                    setProgress((video.currentTime / (video.duration || 1)) * 100);
                 }
             }, 100);
         } else {
             video.pause();
 
-            // Stop progress tracking
+            // Clear progress tracking
             if (progressInterval.current) {
                 clearInterval(progressInterval.current);
             }
@@ -384,14 +427,7 @@ export default function ReelPlayer({
                 clearInterval(progressInterval.current);
             }
         };
-    }, [isPlaying, videoLoaded, isTransitioning, videoDuration]);
-
-    // Handle video mute/unmute
-    useEffect(() => {
-        if (videoRef.current) {
-            videoRef.current.muted = isMuted;
-        }
-    }, [isMuted]);
+    }, [isPlaying, videoLoaded, isTransitioning]);
 
     // Reset progress when reel changes
     useEffect(() => {
@@ -401,9 +437,9 @@ export default function ReelPlayer({
         }
     }, [currentReel]);
 
-    // Add keyboard navigation for desktop
+    // Keyboard navigation
     useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
+        const handleKeyDown = (e) => {
             if (isTransitioning) return;
 
             // Show controls on any key press
@@ -423,6 +459,7 @@ export default function ReelPlayer({
                     navigateToReel('right');
                     break;
                 case ' ': // Space
+                    e.preventDefault(); // Prevent scrolling
                     setIsPlaying(!isPlaying);
                     break;
                 case 'm':
@@ -465,8 +502,7 @@ export default function ReelPlayer({
         };
     }, [isPlaying, isMuted, showWhatIf, showInfo, showKeyboardHelp, isTransitioning, currentReel, isLiked, isSaved]);
 
-
-    // Navigate between reels based on direction - optimized for instant transitions
+    // Navigate between reels with optimized transitions
     const navigateToReel = (direction: 'up' | 'down' | 'left' | 'right') => {
         if (!currentReel || isTransitioning) return;
 
@@ -489,9 +525,9 @@ export default function ReelPlayer({
         setShowKeyboardHelp(false);
 
         // OPTIMIZED TRANSITION:
-        // 1. Play animation for 200ms (shortened from 300ms)
+        // 1. Play animation for shorter duration (150ms)
         // 2. Switch to new reel
-        // 3. Start playing new reel immediately if preloaded
+        // 3. Start playing new reel immediately
         setTimeout(() => {
             if (onReelChange) {
                 onReelChange(nextReel.id);
@@ -499,16 +535,16 @@ export default function ReelPlayer({
 
             setCurrentReel(nextReel);
 
-            // Quickly reset navigation states
+            // Reset navigation states quickly
             setTimeout(() => {
                 setDirection(null);
                 setIsTransitioning(false);
                 setIsPlaying(true);
-            }, 100); // Even shorter delay for snappier UI
-        }, 200); // Shorter animation time for more responsive feel
+            }, 50); // Shorter delay for snappier UI
+        }, 150); // Shorter animation time for more responsive feel
     };
 
-    // Handle swipe gestures with better sensitivity
+    // Optimize swipe handling for better mobile experience
     const handlers = useSwipeable({
         onSwiped: (eventData) => {
             const { dir } = eventData;
@@ -524,7 +560,7 @@ export default function ReelPlayer({
                 return;
             }
 
-            // Map swipe direction to navigation direction (lowercase for consistency)
+            // Map swipe direction to navigation direction
             switch (dir.toLowerCase()) {
                 case 'up':
                     navigateToReel('up');
@@ -541,9 +577,9 @@ export default function ReelPlayer({
             }
         },
         preventDefaultTouchmoveEvent: true,
-        trackMouse: false, // Only track on touch devices for better performance
-        delta: 30, // Lower threshold for easier swiping (was 50)
-        swipeDuration: 800, // Allow slightly longer swipes (was 500)
+        trackMouse: false, // Only track on touch devices
+        delta: 25, // Lower threshold for easier swiping (more sensitive)
+        swipeDuration: 800, // Allow slightly longer swipes
     });
 
     const handleVideoClick = () => {
@@ -570,22 +606,12 @@ export default function ReelPlayer({
         e?.stopPropagation();
         setShowWhatIf(!showWhatIf);
         setShowControls(true);
-
-        // Reset video ended state when opening what-if
-        if (!showWhatIf) {
-            setVideoEnded(false);
-        }
     };
 
     const toggleLike = (e?: React.MouseEvent) => {
         e?.stopPropagation();
         setIsLiked(!isLiked);
         setShowControls(true);
-
-        // Animate heart effect when liking
-        if (!isLiked) {
-            // Here you could add a heart animation
-        }
     };
 
     const toggleSave = (e?: React.MouseEvent) => {
@@ -613,12 +639,8 @@ export default function ReelPlayer({
     };
 
     const handleWhatIfSelect = (scenarioId: string) => {
-        // In a real app, you would navigate to the scenario
         setShowWhatIf(false);
         setShowControls(true);
-
-        // For now, just close the overlay and show a notification
-        console.log(`Selected scenario ${scenarioId}`);
     };
 
     // Get creator info
@@ -681,15 +703,15 @@ export default function ReelPlayer({
                         }}
                         transition={{
                             type: "spring",
-                            damping: 30,
-                            stiffness: 300,
-                            duration: 0.2
+                            damping: 25,
+                            stiffness: 350,
+                            duration: 0.15
                         }}
                     >
                         {/* Main Video Element */}
                         <video
                             ref={videoRef}
-                            className={`w-full h-full object-cover ${videoLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
+                            className={`w-full h-full object-cover ${videoLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`}
                             loop
                             playsInline
                             poster={currentReel.thumbnailUrl}
@@ -702,13 +724,14 @@ export default function ReelPlayer({
                                 <img
                                     src={currentReel.thumbnailUrl}
                                     alt={currentReel.title}
-                                    className="w-full h-full object-cover opacity-50"
+                                    className="w-full h-full object-cover opacity-60"
                                 />
+                                <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/80" />
                                 <div className="absolute inset-0 flex items-center justify-center">
                                     <motion.div
-                                        className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full"
+                                        className="w-16 h-16 border-4 border-primary-light border-t-transparent rounded-full"
                                         animate={{ rotate: 360 }}
-                                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                                     />
                                 </div>
                             </div>
@@ -724,7 +747,7 @@ export default function ReelPlayer({
 
                 {/* Overlay with controls and info */}
                 <div
-                    className={`absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/80 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}
+                    className={`absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}
                     onClick={(e) => {
                         e.stopPropagation();
                         setShowControls(true);
@@ -733,7 +756,7 @@ export default function ReelPlayer({
                     {/* Top Bar */}
                     <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                            <div className="bg-primary/80 backdrop-blur-sm rounded-full px-4 py-1 text-sm">
+                            <div className="bg-primary/80 backdrop-blur-sm rounded-full px-4 py-1 text-sm shadow-sm shadow-black/20">
                                 {currentReel.type === 'hyper' ? 'HyperReel' : currentReel.episodeNumber ? `Episode ${currentReel.episodeNumber}` : 'Featured'}
                             </div>
 
@@ -749,24 +772,24 @@ export default function ReelPlayer({
                             className="flex items-center"
                             whileHover={{ scale: 1.05 }}
                         >
-                            <div className="w-8 h-8 bg-gradient-to-r from-primary to-primary-secondary rounded-full mr-2 flex items-center justify-center text-white font-bold">
+                            <div className="w-8 h-8 bg-gradient-to-r from-primary to-primary-secondary rounded-full mr-2 flex items-center justify-center text-white font-bold shadow-md shadow-black/20">
                                 K
                             </div>
-                            <span className="font-bold">KnowScroll</span>
+                            <span className="font-bold drop-shadow-md">KnowScroll</span>
                         </motion.div>
                     </div>
 
                     {/* Bottom Info */}
                     <div className="absolute bottom-20 md:bottom-8 left-4 right-20">
-                        <h2 className="text-xl md:text-2xl font-bold mb-1">{currentReel.title}</h2>
-                        <p className="text-sm text-gray-200 mb-2 line-clamp-2">{currentReel.description}</p>
+                        <h2 className="text-xl md:text-2xl font-bold mb-1 drop-shadow-md">{currentReel.title}</h2>
+                        <p className="text-sm text-gray-200 mb-2 line-clamp-2 drop-shadow-md">{currentReel.description}</p>
 
                         {/* Tags */}
                         <div className="flex flex-wrap gap-2 mb-2">
                             {currentReel.tags.slice(0, 3).map((tag, index) => (
                                 <motion.span
                                     key={index}
-                                    className="text-xs bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full"
+                                    className="text-xs bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full shadow-sm"
                                     whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.2)" }}
                                 >
                                     {tag}
@@ -780,12 +803,12 @@ export default function ReelPlayer({
                                 className="flex items-center"
                                 whileHover={{ x: 3 }}
                             >
-                                <div className="w-8 h-8 rounded-full bg-primary/30 mr-2 flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-full bg-primary/30 mr-2 flex items-center justify-center shadow-sm">
                                     <span className="text-sm font-semibold">{creator.name.charAt(0)}</span>
                                 </div>
                                 <div>
-                                    <p className="text-sm font-semibold">{creator.name}</p>
-                                    <p className="text-xs text-gray-300">@{creator.username}</p>
+                                    <p className="text-sm font-semibold drop-shadow-md">{creator.name}</p>
+                                    <p className="text-xs text-gray-300 drop-shadow-md">@{creator.username}</p>
                                 </div>
                             </motion.div>
                         )}
@@ -794,14 +817,14 @@ export default function ReelPlayer({
                     {/* Right Side Controls */}
                     <div className="absolute right-4 bottom-24 md:bottom-28 flex flex-col items-center space-y-4">
                         <motion.button
-                            className={`w-12 h-12 flex items-center justify-center ${isLiked ? 'bg-red-500' : 'bg-white/20'} backdrop-blur-sm rounded-full transition-colors duration-300`}
+                            className={`w-12 h-12 flex items-center justify-center ${isLiked ? 'bg-red-500' : 'bg-white/20'} backdrop-blur-sm rounded-full transition-colors duration-200 shadow-lg shadow-black/20`}
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={toggleLike}
                         >
                             <FaHeart className={`text-xl ${isLiked ? 'text-white' : 'text-white'}`} />
                             <motion.span
-                                className="absolute -bottom-5 text-xs"
+                                className="absolute -bottom-5 text-xs drop-shadow-md"
                                 animate={{ scale: isLiked ? [1, 1.5, 1] : 1 }}
                                 transition={{ duration: 0.3 }}
                             >
@@ -810,43 +833,43 @@ export default function ReelPlayer({
                         </motion.button>
 
                         <motion.button
-                            className="w-12 h-12 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full"
+                            className="w-12 h-12 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full shadow-lg shadow-black/20"
                             whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.3)" }}
                             whileTap={{ scale: 0.9 }}
                             onClick={handleThreadOpen}
                         >
                             <FaComment className="text-xl text-white" />
-                            <span className="absolute -bottom-5 text-xs">Chat</span>
+                            <span className="absolute -bottom-5 text-xs drop-shadow-md">Chat</span>
                         </motion.button>
 
                         <motion.button
-                            className="w-12 h-12 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full"
+                            className="w-12 h-12 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full shadow-lg shadow-black/20"
                             whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.3)" }}
                             whileTap={{ scale: 0.9 }}
                         >
                             <FaShare className="text-xl text-white" />
-                            <span className="absolute -bottom-5 text-xs">Share</span>
+                            <span className="absolute -bottom-5 text-xs drop-shadow-md">Share</span>
                         </motion.button>
 
                         <motion.button
-                            className={`w-12 h-12 flex items-center justify-center ${isSaved ? 'bg-primary' : 'bg-white/20'} backdrop-blur-sm rounded-full transition-colors duration-300`}
+                            className={`w-12 h-12 flex items-center justify-center ${isSaved ? 'bg-primary' : 'bg-white/20'} backdrop-blur-sm rounded-full transition-colors duration-200 shadow-lg shadow-black/20`}
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={toggleSave}
                         >
                             <FaBookmark className={`text-xl ${isSaved ? 'text-white' : 'text-white'}`} />
-                            <span className="absolute -bottom-5 text-xs">Save</span>
+                            <span className="absolute -bottom-5 text-xs drop-shadow-md">Save</span>
                         </motion.button>
 
                         {currentReel.whatIfScenarios && currentReel.whatIfScenarios.length > 0 && (
                             <motion.button
-                                className={`w-12 h-12 flex items-center justify-center ${showWhatIf ? 'bg-primary' : 'bg-white/20'} backdrop-blur-sm rounded-full transition-colors duration-300`}
+                                className={`w-12 h-12 flex items-center justify-center ${showWhatIf ? 'bg-primary' : 'bg-white/20'} backdrop-blur-sm rounded-full transition-colors duration-200 shadow-lg shadow-black/20`}
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
                                 onClick={toggleWhatIf}
                             >
                                 <FaLightbulb className="text-xl text-white" />
-                                <span className="absolute -bottom-5 text-xs">What If</span>
+                                <span className="absolute -bottom-5 text-xs drop-shadow-md">What If</span>
                             </motion.button>
                         )}
                     </div>
@@ -854,8 +877,8 @@ export default function ReelPlayer({
                     {/* Video Controls Overlay - Bottom */}
                     <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center space-x-3">
                         <motion.button
-                            className="w-10 h-10 flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-full"
-                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
+                            className="w-10 h-10 flex items-center justify-center bg-white/15 backdrop-blur-sm rounded-full shadow-md shadow-black/20"
+                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.25)" }}
                             whileTap={{ scale: 0.9 }}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -866,8 +889,8 @@ export default function ReelPlayer({
                         </motion.button>
 
                         <motion.button
-                            className="w-10 h-10 flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-full"
-                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
+                            className="w-10 h-10 flex items-center justify-center bg-white/15 backdrop-blur-sm rounded-full shadow-md shadow-black/20"
+                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.25)" }}
                             whileTap={{ scale: 0.9 }}
                             onClick={toggleMute}
                         >
@@ -875,7 +898,7 @@ export default function ReelPlayer({
                         </motion.button>
 
                         <div className="flex-1 mx-1">
-                            <div className="relative h-1.5 bg-white/20 rounded-full overflow-hidden">
+                            <div className="relative h-1.5 bg-white/20 rounded-full overflow-hidden shadow-inner shadow-black/20">
                                 <motion.div
                                     className="absolute h-full bg-primary rounded-full"
                                     style={{ width: `${progress}%` }}
@@ -887,8 +910,8 @@ export default function ReelPlayer({
                         </div>
 
                         <motion.button
-                            className="w-10 h-10 flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-full"
-                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
+                            className="w-10 h-10 flex items-center justify-center bg-white/15 backdrop-blur-sm rounded-full shadow-md shadow-black/20"
+                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.25)" }}
                             whileTap={{ scale: 0.9 }}
                             onClick={toggleInfo}
                         >
@@ -897,8 +920,8 @@ export default function ReelPlayer({
 
                         {isDesktop && (
                             <motion.button
-                                className="w-10 h-10 flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-full hidden md:flex"
-                                whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
+                                className="w-10 h-10 flex items-center justify-center bg-white/15 backdrop-blur-sm rounded-full shadow-md shadow-black/20 hidden md:flex"
+                                whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.25)" }}
                                 whileTap={{ scale: 0.9 }}
                                 onClick={toggleKeyboardHelp}
                             >
@@ -907,16 +930,16 @@ export default function ReelPlayer({
                         )}
                     </div>
 
-                    {/* Desktop Arrow Controls with Enhanced UI - only show when enabled */}
+                    {/* Desktop Navigation Arrows - only show when enabled */}
                     {showArrows && isDesktop && (
                         <>
                             {/* Next Episode (Up) Arrow */}
                             {canNavigateUp && (
                                 <motion.button
-                                    className="absolute top-24 left-1/2 transform -translate-x-1/2 w-14 h-14 rounded-full bg-gradient-to-b from-primary/30 to-black/60 backdrop-blur-md flex items-center justify-center border border-primary/30 hidden md:flex z-20"
+                                    className="absolute top-24 left-1/2 transform -translate-x-1/2 w-14 h-14 rounded-full bg-gradient-to-b from-primary/40 to-black/50 backdrop-blur-md flex items-center justify-center border border-primary/30 hidden md:flex z-20 shadow-lg shadow-black/30"
                                     initial={{ y: 0, opacity: 0.8 }}
                                     animate={{
-                                        y: [0, -10, 0],
+                                        y: [0, -5, 0],
                                         opacity: [0.8, 1, 0.8]
                                     }}
                                     transition={{
@@ -926,8 +949,8 @@ export default function ReelPlayer({
                                     }}
                                     whileHover={{
                                         scale: 1.1,
-                                        backgroundColor: "rgba(143, 70, 193, 0.4)",
-                                        boxShadow: "0 0 20px rgba(143, 70, 193, 0.4)"
+                                        backgroundColor: "rgba(143, 70, 193, 0.5)",
+                                        boxShadow: "0 0 20px rgba(143, 70, 193, 0.5)"
                                     }}
                                     whileTap={{ scale: 0.9 }}
                                     onClick={(e) => {
@@ -942,10 +965,10 @@ export default function ReelPlayer({
                             {/* Previous Episode (Down) Arrow */}
                             {canNavigateDown && (
                                 <motion.button
-                                    className="absolute bottom-28 left-1/2 transform -translate-x-1/2 w-14 h-14 rounded-full bg-gradient-to-t from-primary/30 to-black/60 backdrop-blur-md flex items-center justify-center border border-primary/30 hidden md:flex z-20"
+                                    className="absolute bottom-28 left-1/2 transform -translate-x-1/2 w-14 h-14 rounded-full bg-gradient-to-t from-primary/40 to-black/50 backdrop-blur-md flex items-center justify-center border border-primary/30 hidden md:flex z-20 shadow-lg shadow-black/30"
                                     initial={{ y: 0, opacity: 0.8 }}
                                     animate={{
-                                        y: [0, 10, 0],
+                                        y: [0, 5, 0],
                                         opacity: [0.8, 1, 0.8]
                                     }}
                                     transition={{
@@ -956,8 +979,8 @@ export default function ReelPlayer({
                                     }}
                                     whileHover={{
                                         scale: 1.1,
-                                        backgroundColor: "rgba(143, 70, 193, 0.4)",
-                                        boxShadow: "0 0 20px rgba(143, 70, 193, 0.4)"
+                                        backgroundColor: "rgba(143, 70, 193, 0.5)",
+                                        boxShadow: "0 0 20px rgba(143, 70, 193, 0.5)"
                                     }}
                                     whileTap={{ scale: 0.9 }}
                                     onClick={(e) => {
@@ -972,10 +995,10 @@ export default function ReelPlayer({
                             {/* Left (Different Series) Arrow */}
                             {canNavigateLeft && (
                                 <motion.button
-                                    className="absolute top-1/2 left-10 transform -translate-y-1/2 w-14 h-14 rounded-full bg-gradient-to-r from-primary/30 to-black/60 backdrop-blur-md flex items-center justify-center border border-primary/30 hidden md:flex z-20"
+                                    className="absolute top-1/2 left-8 transform -translate-y-1/2 w-14 h-14 rounded-full bg-gradient-to-r from-primary/40 to-black/50 backdrop-blur-md flex items-center justify-center border border-primary/30 hidden md:flex z-20 shadow-lg shadow-black/30"
                                     initial={{ x: 0, opacity: 0.8 }}
                                     animate={{
-                                        x: [0, -10, 0],
+                                        x: [0, -5, 0],
                                         opacity: [0.8, 1, 0.8]
                                     }}
                                     transition={{
@@ -986,8 +1009,8 @@ export default function ReelPlayer({
                                     }}
                                     whileHover={{
                                         scale: 1.1,
-                                        backgroundColor: "rgba(143, 70, 193, 0.4)",
-                                        boxShadow: "0 0 20px rgba(143, 70, 193, 0.4)"
+                                        backgroundColor: "rgba(143, 70, 193, 0.5)",
+                                        boxShadow: "0 0 20px rgba(143, 70, 193, 0.5)"
                                     }}
                                     whileTap={{ scale: 0.9 }}
                                     onClick={(e) => {
@@ -1002,10 +1025,10 @@ export default function ReelPlayer({
                             {/* Right (Related Content) Arrow */}
                             {canNavigateRight && (
                                 <motion.button
-                                    className="absolute top-1/2 right-10 transform -translate-y-1/2 w-14 h-14 rounded-full bg-gradient-to-l from-primary/30 to-black/60 backdrop-blur-md flex items-center justify-center border border-primary/30 hidden md:flex z-20"
+                                    className="absolute top-1/2 right-8 transform -translate-y-1/2 w-14 h-14 rounded-full bg-gradient-to-l from-primary/40 to-black/50 backdrop-blur-md flex items-center justify-center border border-primary/30 hidden md:flex z-20 shadow-lg shadow-black/30"
                                     initial={{ x: 0, opacity: 0.8 }}
                                     animate={{
-                                        x: [0, 10, 0],
+                                        x: [0, 5, 0],
                                         opacity: [0.8, 1, 0.8]
                                     }}
                                     transition={{
@@ -1016,8 +1039,8 @@ export default function ReelPlayer({
                                     }}
                                     whileHover={{
                                         scale: 1.1,
-                                        backgroundColor: "rgba(143, 70, 193, 0.4)",
-                                        boxShadow: "0 0 20px rgba(143, 70, 193, 0.4)"
+                                        backgroundColor: "rgba(143, 70, 193, 0.5)",
+                                        boxShadow: "0 0 20px rgba(143, 70, 193, 0.5)"
                                     }}
                                     whileTap={{ scale: 0.9 }}
                                     onClick={(e) => {
@@ -1036,14 +1059,14 @@ export default function ReelPlayer({
                 <AnimatePresence>
                     {direction && (
                         <motion.div
-                            className="absolute inset-0 pointer-events-none flex items-center justify-center bg-black/20 backdrop-blur-sm"
+                            className="absolute inset-0 pointer-events-none flex items-center justify-center bg-black/30 backdrop-blur-sm"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 0.7 }}
                             exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
+                            transition={{ duration: 0.15 }}
                         >
                             <motion.div
-                                className="w-20 h-20 rounded-full bg-primary/30 backdrop-blur-md flex items-center justify-center"
+                                className="w-20 h-20 rounded-full bg-primary/40 backdrop-blur-md flex items-center justify-center shadow-lg shadow-black/30"
                                 initial={{ scale: 0.8, opacity: 0.5 }}
                                 animate={{ scale: 1, opacity: 1 }}
                                 exit={{ scale: 1.2, opacity: 0 }}
@@ -1056,8 +1079,6 @@ export default function ReelPlayer({
                         </motion.div>
                     )}
                 </AnimatePresence>
-
-                {/* Mobile Navigation Hints - Only visible when video ends (handled by separate component) */}
 
                 {/* What If Scenarios Overlay */}
                 {currentReel.whatIfScenarios && (
@@ -1073,11 +1094,11 @@ export default function ReelPlayer({
                 <AnimatePresence>
                     {showInfo && (
                         <motion.div
-                            className="absolute inset-0 bg-black/80 backdrop-blur-md p-6 z-20"
+                            className="absolute inset-0 bg-black/85 backdrop-blur-md p-6 z-20"
                             initial={{ opacity: 0, y: 50 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 50 }}
-                            transition={{ duration: 0.3 }}
+                            transition={{ duration: 0.25 }}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setShowInfo(false);
@@ -1102,10 +1123,10 @@ export default function ReelPlayer({
                                 </motion.button>
                             </div>
 
-                            <div className="overflow-y-auto max-h-[calc(100vh-150px)]">
+                            <div className="overflow-y-auto max-h-[calc(100vh-150px)] pr-2">
                                 {/* Series Info */}
                                 {currentReel.seriesId && currentReel.episodeNumber && (
-                                    <div className="mb-6 bg-white/5 backdrop-blur-sm rounded-xl p-4">
+                                    <div className="mb-6 bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
                                         <div className="flex items-center mb-2">
                                             <div className="px-3 py-1 bg-primary/30 rounded-full text-xs mr-2">
                                                 Series
@@ -1127,19 +1148,19 @@ export default function ReelPlayer({
                                     <p className="text-white/90 text-base mb-6">{currentReel.description}</p>
 
                                     <div className="grid grid-cols-2 gap-4 mb-6">
-                                        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3">
+                                        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
                                             <p className="text-xs text-white/70 mb-1">Views</p>
                                             <p className="font-semibold">{currentReel.views.toLocaleString()}</p>
                                         </div>
-                                        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3">
+                                        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
                                             <p className="text-xs text-white/70 mb-1">Likes</p>
                                             <p className="font-semibold">{currentReel.likes.toLocaleString()}</p>
                                         </div>
-                                        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3">
+                                        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
                                             <p className="text-xs text-white/70 mb-1">Duration</p>
                                             <p className="font-semibold">{Math.floor(currentReel.duration / 60)}:{(currentReel.duration % 60).toString().padStart(2, '0')}</p>
                                         </div>
-                                        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3">
+                                        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 border border-white/10">
                                             <p className="text-xs text-white/70 mb-1">Published</p>
                                             <p className="font-semibold">{new Date(currentReel.createdAt).toLocaleDateString()}</p>
                                         </div>
@@ -1150,7 +1171,7 @@ export default function ReelPlayer({
                                         {currentReel.tags.map((tag, index) => (
                                             <motion.span
                                                 key={index}
-                                                className="text-sm bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full"
+                                                className="text-sm bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full border border-white/10"
                                                 whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.2)" }}
                                             >
                                                 {tag}
@@ -1161,7 +1182,7 @@ export default function ReelPlayer({
 
                                 {/* Creator Info */}
                                 {creator && (
-                                    <div className="mb-6 bg-white/5 backdrop-blur-sm rounded-xl p-4">
+                                    <div className="mb-6 bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
                                         <h4 className="font-semibold mb-3">Creator</h4>
                                         <div className="flex items-center">
                                             <div className="w-12 h-12 rounded-full bg-primary/30 mr-3 flex items-center justify-center">
@@ -1198,7 +1219,7 @@ export default function ReelPlayer({
                                                 .map(relatedReel => (
                                                     <motion.div
                                                         key={relatedReel.id}
-                                                        className="bg-white/5 backdrop-blur-sm rounded-xl p-3 flex items-center cursor-pointer"
+                                                        className="bg-white/5 backdrop-blur-sm rounded-xl p-3 flex items-center cursor-pointer border border-white/10"
                                                         whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.1)" }}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -1234,11 +1255,11 @@ export default function ReelPlayer({
                 <AnimatePresence>
                     {showKeyboardHelp && (
                         <motion.div
-                            className="absolute inset-0 bg-black/80 backdrop-blur-md p-6 z-20"
+                            className="absolute inset-0 bg-black/85 backdrop-blur-md p-6 z-20"
                             initial={{ opacity: 0, y: 50 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 50 }}
-                            transition={{ duration: 0.3 }}
+                            transition={{ duration: 0.25 }}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 setShowKeyboardHelp(false);
@@ -1264,13 +1285,13 @@ export default function ReelPlayer({
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4">
+                                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
                                     <h4 className="font-semibold mb-3">Navigation</h4>
 
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center">
-                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3 border border-white/20">
                                                     <FaArrowUp className="text-sm" />
                                                 </div>
                                                 <span>Next episode</span>
@@ -1279,7 +1300,7 @@ export default function ReelPlayer({
 
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center">
-                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3 border border-white/20">
                                                     <FaArrowDown className="text-sm" />
                                                 </div>
                                                 <span>Previous episode</span>
@@ -1288,7 +1309,7 @@ export default function ReelPlayer({
 
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center">
-                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3 border border-white/20">
                                                     <FaArrowLeft className="text-sm" />
                                                 </div>
                                                 <span>Different series/content</span>
@@ -1297,7 +1318,7 @@ export default function ReelPlayer({
 
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center">
-                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3 border border-white/20">
                                                     <FaArrowRight className="text-sm" />
                                                 </div>
                                                 <span>Related content</span>
@@ -1306,13 +1327,13 @@ export default function ReelPlayer({
                                     </div>
                                 </div>
 
-                                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4">
+                                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
                                     <h4 className="font-semibold mb-3">Controls</h4>
 
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center">
-                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3 border border-white/20">
                                                     <span className="text-sm">Space</span>
                                                 </div>
                                                 <span>Play/Pause</span>
@@ -1321,7 +1342,7 @@ export default function ReelPlayer({
 
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center">
-                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3 border border-white/20">
                                                     <span className="text-sm">M</span>
                                                 </div>
                                                 <span>Mute/Unmute</span>
@@ -1330,7 +1351,7 @@ export default function ReelPlayer({
 
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center">
-                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3 border border-white/20">
                                                     <span className="text-sm">L</span>
                                                 </div>
                                                 <span>Like</span>
@@ -1339,7 +1360,7 @@ export default function ReelPlayer({
 
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center">
-                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3 border border-white/20">
                                                     <span className="text-sm">B</span>
                                                 </div>
                                                 <span>Save</span>
@@ -1348,7 +1369,7 @@ export default function ReelPlayer({
 
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center">
-                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3 border border-white/20">
                                                     <span className="text-sm">I</span>
                                                 </div>
                                                 <span>Toggle info panel</span>
@@ -1357,7 +1378,7 @@ export default function ReelPlayer({
 
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center">
-                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3 border border-white/20">
                                                     <span className="text-sm">W</span>
                                                 </div>
                                                 <span>Toggle &quot;What If&quot; scenarios</span>
@@ -1366,7 +1387,7 @@ export default function ReelPlayer({
 
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center">
-                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3 border border-white/20">
                                                     <span className="text-sm">?</span>
                                                 </div>
                                                 <span>Show keyboard shortcuts</span>
@@ -1375,7 +1396,7 @@ export default function ReelPlayer({
 
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center">
-                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3 border border-white/20">
                                                     <span className="text-sm">ESC</span>
                                                 </div>
                                                 <span>Close any open panel</span>

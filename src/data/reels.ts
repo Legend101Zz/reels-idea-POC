@@ -111,7 +111,7 @@ export const reels: Reel[] = [
     description:
       "Part 1 of 3: The revolutionary concept that all particles exhibit both wave and particle properties. This counterintuitive idea is at the heart of quantum mechanics.",
     videoUrl: "/videos/quantum-physics.mp4",
-    thumbnailUrl: "/images/quantum-thumb.jpg",
+    thumbnailUrl: "/images/quantum-physics-thumb.jpg",
     duration: 62,
     views: 9800,
     likes: 2700,
@@ -128,7 +128,7 @@ export const reels: Reel[] = [
     description:
       "Part 2 of 3: Understanding how quantum objects can exist in multiple states simultaneously until measured. The famous Schrödinger's cat thought experiment illustrates this bizarre quantum effect.",
     videoUrl: "/videos/quantum-physics.mp4",
-    thumbnailUrl: "/images/quantum-thumb.jpg",
+    thumbnailUrl: "/images/quantum-physics-thumb.jpg",
     duration: 64,
     views: 9200,
     likes: 2500,
@@ -153,7 +153,7 @@ export const reels: Reel[] = [
     description:
       "Part 3 of 3: The 'spooky action at a distance' that troubled Einstein. Quantum entanglement connects particles so that the quantum state of each particle cannot be described independently of the others.",
     videoUrl: "/videos/quantum-physics.mp4",
-    thumbnailUrl: "/images/quantum-thumb.jpg",
+    thumbnailUrl: "/images/quantum-physics-thumb.jpg",
     duration: 67,
     views: 8900,
     likes: 2400,

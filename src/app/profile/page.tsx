@@ -8,8 +8,9 @@ import {
     FaUser, FaVideo, FaBell, FaSearch, FaComment, FaShareAlt, FaPlus, FaEllipsisH,
     FaArrowLeft, FaTimes, FaCheck, FaClock, FaPlay, FaPause, FaLightbulb, FaPaperPlane,
     FaLock, FaBookmark, FaHeart, FaInfoCircle, FaRandom, FaMagic, FaGraduationCap,
-    FaSpaceShuttle, FaBrain, FaAtom, FaStarHalfAlt, FaFire, FaRocket, FaBook
+    FaSpaceShuttle, FaBrain, FaAtom, FaStarHalfAlt, FaFire, FaRocket, FaBook, FaHome, FaCompass
 } from 'react-icons/fa';
+import Link from 'next/link';
 
 // Mock data for the user profile
 const userData = {
@@ -2522,99 +2523,71 @@ export default function UserProfile() {
 
             {/* Mobile Bottom Navigation */}
             <motion.nav
-                className="fixed bottom-0 inset-x-0 h-20 bg-background/90 backdrop-blur-xl border-t border-white/10 flex items-center justify-around z-30"
+                className="fixed bottom-0 inset-x-0 h-16 bg-background/80 backdrop-blur-md border-t border-white/10 flex items-center justify-around z-30"
                 initial={{ y: 100 }}
                 animate={{ y: 0 }}
-                transition={{ delay: 0.5, type: "spring", stiffness: 300, damping: 30 }}
-                style={{ boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.3)' }}
+                transition={{ delay: 0.5, type: "spring" }}
             >
-                <motion.button
-                    className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ y: -4 }}
-                    whileTap={{ scale: 0.9 }}
-                >
+                <Link href="/">
                     <motion.div
-                        className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mb-1"
-                        whileHover={{ backgroundColor: "rgba(255,255,255,0.1)" }}
+                        className="flex flex-col items-center text-white/70"
+                        whileHover={{ scale: 1.1, color: "#d56f66" }}
+                        whileTap={{ scale: 0.95 }}
                     >
-                        <FaVideo className="text-white/60" />
+                        <FaHome className="text-xl mb-1" />
+                        <span className="text-xs">Home</span>
                     </motion.div>
-                    <span className="text-xs text-white/60">Feed</span>
-                </motion.button>
+                </Link>
 
-                <motion.button
-                    className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ y: -4 }}
-                    whileTap={{ scale: 0.9 }}
-                >
+                <Link href="/feed">
                     <motion.div
-                        className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mb-1"
-                        whileHover={{ backgroundColor: "rgba(255,255,255,0.1)" }}
+                        className="flex flex-col items-center text-white/70"
+                        whileHover={{ scale: 1.1, color: "#d56f66" }}
+                        whileTap={{ scale: 0.95 }}
                     >
-                        <FaSearch className="text-white/60" />
+                        <FaPlay className="text-xl mb-1" />
+                        <span className="text-xs">Feed</span>
                     </motion.div>
-                    <span className="text-xs text-white/60">Explore</span>
-                </motion.button>
+                </Link>
 
-                <motion.button
-                    className="flex flex-col items-center justify-center -mt-6"
-                    whileHover={{ y: -4 }}
-                    whileTap={{ scale: 0.9 }}
-                >
+                <Link href="/create">
                     <motion.div
-                        className="w-16 h-16 rounded-full bg-gradient-to-r from-primary to-primary-secondary flex items-center justify-center shadow-glow"
-                        animate={{
-                            boxShadow: [
-                                "0 0 0px rgba(143, 70, 193, 0.3)",
-                                "0 0 25px rgba(143, 70, 193, 0.6)",
-                                "0 0 0px rgba(143, 70, 193, 0.3)"
-                            ]
-                        }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                        whileHover={{
-                            scale: 1.1,
-                            boxShadow: "0 0 30px rgba(143, 70, 193, 0.7)"
-                        }}
+                        className="w-12 h-12 bg-gradient-to-r from-primary to-primary-secondary rounded-full flex items-center justify-center -mt-4 shadow-lg"
+                        whileHover={{ scale: 1.1, boxShadow: "0 10px 25px -5px rgba(143, 70, 193, 0.5)" }}
+                        whileTap={{ scale: 0.95 }}
                     >
-                        <FaPlus className="text-xl" />
+                        <FaPlus className="text-lg" />
                     </motion.div>
-                </motion.button>
+                </Link>
 
-                <motion.button
-                    className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ y: -4 }}
-                    whileTap={{ scale: 0.9 }}
-                >
+                <Link href="/explore">
                     <motion.div
-                        className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mb-1"
-                        whileHover={{ backgroundColor: "rgba(255,255,255,0.1)" }}
+                        className="flex flex-col items-center text-white"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
                     >
-                        <FaComment className="text-white/60" />
+                        <div className="relative">
+                            <FaCompass className="text-xl mb-1 text-primary" />
+                            <motion.div
+                                className="absolute -top-1 -right-1 w-2 h-2 bg-primary-secondary rounded-full"
+                                animate={{ scale: [1, 1.2, 1] }}
+                                transition={{ duration: 2, repeat: Infinity }}
+                            />
+                        </div>
+                        <span className="text-xs text-primary-light">Explore</span>
                     </motion.div>
-                    <span className="text-xs text-white/60">Threads</span>
-                </motion.button>
+                </Link>
 
-                <motion.button
-                    className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ y: -4 }}
-                    whileTap={{ scale: 0.9 }}
-                >
+                <Link href="/profile">
                     <motion.div
-                        className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-primary-secondary/30 flex items-center justify-center mb-1"
-                        animate={{
-                            boxShadow: [
-                                "0 0 0px rgba(143, 70, 193, 0.2)",
-                                "0 0 10px rgba(143, 70, 193, 0.4)",
-                                "0 0 0px rgba(143, 70, 193, 0.2)"
-                            ]
-                        }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                        whileHover={{ backgroundColor: "rgba(143, 70, 193, 0.3)" }}
+                        className="flex flex-col items-center text-white/70"
+                        whileHover={{ scale: 1.1, color: "#d56f66" }}
+                        whileTap={{ scale: 0.95 }}
                     >
-                        <FaUser className="text-primary-light" />
+                        <FaUser className="text-xl mb-1" />
+                        <span className="text-xs">Profile</span>
                     </motion.div>
-                    <span className="text-xs text-primary-light">Profile</span>
-                </motion.button>
+                </Link>
             </motion.nav>
 
             {/* CSS Styles */}
