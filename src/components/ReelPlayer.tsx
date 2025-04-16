@@ -1,1474 +1,1431 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 //@ts-nocheck
-"use client"
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence, useAnimation } from 'framer-motion';
+"use client";
+
+import { useState, useRef, useEffect } from 'react';
+import { useSwipeable } from 'react-swipeable';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-    FaUser, FaVideo, FaBell, FaSearch, FaComment, FaShareAlt, FaPlus, FaEllipsisH,
-    FaArrowLeft, FaTimes, FaCheck, FaClock, FaPlay, FaPause, FaLightbulb, FaPaperPlane,
-    FaLock, FaBookmark, FaHeart, FaInfoCircle, FaRandom, FaMagic, FaGraduationCap
+    FaHeart, FaComment, FaShare, FaLightbulb, FaVolumeUp,
+    FaVolumeMute, FaPause, FaPlay, FaInfoCircle, FaKeyboard,
+    FaArrowUp, FaArrowDown, FaArrowLeft, FaArrowRight, FaBookmark
 } from 'react-icons/fa';
+import { Reel, WhatIfScenario } from '@/types';
+import { reels } from '@/data/reels';
+import { users } from '@/data/users';
+import EpisodeIndicator from '@/components/EpisodeIndicator';
+import WhatIfOverlay from '@/components/WhatIfOverlay';
 
-// Mock data for the user profile
-const userData = {
-    id: "user1",
-    name: "Alex Johnson",
-    username: "@alex_science",
-    bio: "Physics enthusiast | Science communicator | Always curious about the cosmos",
-    avatar: "/images/avatar-alex.jpg",
-    followers: 1245,
-    following: 368,
-    joinedDate: "April 2024",
-    activity: {
-        views: 284,
-        threads: 12,
-        contributions: 47
-    }
-};
+interface ReelPlayerProps {
+    initialReelId: string;
+    onThreadOpen?: (reelId: string) => void;
+    onReelChange?: (reelId: string) => void;
+    onVideoComplete?: () => void;
+    showArrows?: boolean;
+}
 
-// Mock data for series the user is watching
-const watchingSeries = [
-    {
-        id: "series1",
-        title: "Black Holes",
-        description: "A comprehensive exploration of black holes and their properties",
-        episodes: 5,
-        progress: 3,
-        thumbnailUrl: "/images/black-holes-thumb.jpg",
-        tags: ["Physics", "Space", "Astronomy"],
-        color: "from-[#8f46c1] to-[#a0459b]"
-    },
-    {
-        id: "series2",
-        title: "Quantum Physics",
-        description: "Understanding quantum mechanics and its strange phenomena",
-        episodes: 3,
-        progress: 1,
-        thumbnailUrl: "/images/quantum-physics-thumb.jpg",
-        tags: ["Physics", "Quantum Theory"],
-        color: "from-[#a0459b] to-[#bd4580]"
-    },
-    {
-        id: "series3",
-        title: "AI Revolution",
-        description: "How artificial intelligence is changing our world",
-        episodes: 4,
-        progress: 4,
-        thumbnailUrl: "/images/ai-revolution-thumb.jpg",
-        tags: ["Technology", "AI", "Computing"],
-        color: "from-[#bd4580] to-[#d56f66]"
-    }
-];
-
-// Mock data for threads
-const threadsData = [
-    {
-        id: "thread1",
-        seriesId: "series1",
-        title: "Black Holes",
-        participants: [
-            { id: "user1", name: "Alex", avatar: "/images/avatar-alex.jpg", isOnline: true },
-            { id: "user2", name: "Jamie", avatar: "/images/avatar-jamie.jpg", lastActive: "2h ago" },
-            { id: "user3", name: "Taylor", avatar: "/images/avatar-taylor.jpg", lastActive: "5m ago" }
-        ],
-        messages: [
-            {
-                id: "msg1",
-                userId: "user1",
-                content: "That part about event horizons was mind-blowing!",
-                timestamp: "Today, 12:05 PM",
-                episodeRef: { number: 2, timestamp: "01:45", title: "Event Horizons" }
-            },
-            {
-                id: "msg2",
-                userId: "user3",
-                content: "Check this part!",
-                timestamp: "Today, 12:10 PM",
-                episodeRef: { number: 1, timestamp: "00:52", title: "Black Holes Explained" }
-            },
-            {
-                id: "msg3",
-                userId: "user2",
-                content: "Do you think there's any possibility of using black holes for time travel?",
-                timestamp: "Today, 12:15 PM"
-            },
-            {
-                id: "msg4",
-                userId: "user1",
-                content: "Well, theoretically, the extreme gravity near a black hole does slow down time relative to observers further away (time dilation). But actual time travel? That's still in the realm of science fiction.",
-                timestamp: "Today, 12:18 PM"
-            }
-        ],
-        whatIfScenarios: [
-            {
-                id: "what-if-1",
-                title: "What if... black holes are portals?",
-                description: "Alternative theory generated based on the series content. This could explain disappearing matter.",
-                generatedBy: "user1"
-            },
-            {
-                id: "what-if-2",
-                title: "What if... black holes contain entire universes?",
-                description: "The mass could be powering the creation of new cosmic realms with different physics.",
-                generatedBy: "AI"
-            }
-        ],
-        episodes: [
-            { number: 1, title: "Black Holes Explained", viewed: true, thumbnailUrl: "/images/black-holes-thumb.jpg", duration: "5:20" },
-            { number: 2, title: "Event Horizons", viewed: true, current: true, thumbnailUrl: "/images/black-holes-thumb.jpg", duration: "6:15" },
-            { number: 3, title: "Spaghettification", viewed: true, thumbnailUrl: "/images/black-holes-thumb.jpg", duration: "4:50" },
-            { number: 4, title: "Hawking Radiation", viewed: false, locked: true, thumbnailUrl: "/images/black-holes-thumb.jpg", duration: "7:30" },
-            { number: 5, title: "At the Center of Galaxies", viewed: false, locked: true, thumbnailUrl: "/images/black-holes-thumb.jpg", duration: "6:45" }
-        ]
-    },
-    {
-        id: "thread2",
-        seriesId: "series2",
-        title: "Quantum Physics",
-        participants: [
-            { id: "user1", name: "Alex", avatar: "/images/avatar-alex.jpg", isOnline: true },
-            { id: "user3", name: "Taylor", avatar: "/images/avatar-taylor.jpg", lastActive: "5m ago" }
-        ],
-        messages: [
-            {
-                id: "msg1",
-                userId: "user1",
-                content: "The double-slit experiment still confuses me sometimes.",
-                timestamp: "Yesterday, 15:30 PM"
-            },
-            {
-                id: "msg2",
-                userId: "user3",
-                content: "Look at this part where they explain wave-particle duality.",
-                timestamp: "Yesterday, 15:35 PM",
-                episodeRef: { number: 1, timestamp: "03:24", title: "Wave-Particle Duality" }
-            }
-        ],
-        episodes: [
-            { number: 1, title: "Wave-Particle Duality", viewed: true, current: true, thumbnailUrl: "/images/quantum-physics-thumb.jpg", duration: "5:10" },
-            { number: 2, title: "Superposition", viewed: false, locked: true, thumbnailUrl: "/images/quantum-physics-thumb.jpg", duration: "6:20" },
-            { number: 3, title: "Entanglement", viewed: false, locked: true, thumbnailUrl: "/images/quantum-physics-thumb.jpg", duration: "7:15" }
-        ]
-    }
-];
-
-// Automated responses
-const autoResponses = [
-    "That's a really interesting perspective!",
-    "I never thought about it that way before.",
-    "That connects really well with what we learned in episode 2.",
-    "Have you watched the part about quantum entanglement yet?",
-    "The way the instructor explained that concept made it so much clearer.",
-    "I'm going to rewatch that section, thanks for pointing it out!",
-    "Did you see the visualization they used? It really helped me understand.",
-    "I wonder how this applies to other phenomena we've learned about.",
-    "That's exactly the point I was trying to make last time!",
-    "Do you think this will be covered more in the upcoming episodes?"
-];
-
-// Friends data for creating threads
-const friendsData = [
-    { id: "user2", name: "Jamie Smith", username: "jamie_history", avatar: "/images/avatar-jamie.jpg", isOnline: false, lastActive: "2h ago" },
-    { id: "user3", name: "Taylor Wong", username: "taylor_physics", avatar: "/images/avatar-taylor.jpg", isOnline: false, lastActive: "5m ago" },
-    { id: "user4", name: "Jordan Lee", username: "jordan_math", avatar: "/images/avatar-alex.jpg", isOnline: true }
-];
-
-// Animation variants
-const pageVariants = {
-    initial: { opacity: 0, y: 20 },
-    animate: { opacity: 1, y: 0, transition: { duration: 0.4 } },
-    exit: { opacity: 0, y: -20, transition: { duration: 0.3 } }
-};
-
-const staggerContainer = {
-    hidden: { opacity: 0 },
-    show: {
-        opacity: 1,
-        transition: {
-            staggerChildren: 0.1
-        }
-    }
-};
-
-const staggerItem = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-};
-
-// Main component
-export default function UserProfile() {
-    const [viewState, setViewState] = useState("profile"); // profile, thread, create-thread
-    const [selectedThread, setSelectedThread] = useState(null);
-    const [createThreadState, setCreateThreadState] = useState({ step: 1, seriesId: null, selectedFriends: [] });
-    const [newMessage, setNewMessage] = useState("");
-    const [isTyping, setIsTyping] = useState(false);
-    const [messages, setMessages] = useState([]);
+export default function ReelPlayer({
+    initialReelId,
+    onThreadOpen,
+    onReelChange,
+    onVideoComplete,
+    showArrows = false
+}: ReelPlayerProps) {
+    // Core state
+    const [currentReel, setCurrentReel] = useState<Reel | null>(null);
+    const [isPlaying, setIsPlaying] = useState(true);
+    const [isMuted, setIsMuted] = useState(true);
+    const [showControls, setShowControls] = useState(true);
     const [showWhatIf, setShowWhatIf] = useState(false);
-    const [activeIndex, setActiveIndex] = useState(0);
-    const [currentEpisode, setCurrentEpisode] = useState(1);
+    const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+    const [showInfo, setShowInfo] = useState(false);
+    const [isLiked, setIsLiked] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
 
-    const messagesEndRef = useRef(null);
-    const controls = useAnimation();
+    // Navigation state
+    const [direction, setDirection] = useState<'up' | 'down' | 'left' | 'right' | null>(null);
+    const [isTransitioning, setIsTransitioning] = useState(false);
+    const [isDesktop, setIsDesktop] = useState(false);
+    const [nextReels, setNextReels] = useState<{
+        up?: Reel;
+        down?: Reel;
+        left?: Reel;
+        right?: Reel;
+    }>({});
 
-    // Handle thread selection
-    const handleSelectThread = (threadId) => {
-        const thread = getThreadById(threadId);
-        setSelectedThread(thread);
-        setMessages(thread.messages);
-        setCurrentEpisode(thread.episodes.find(ep => ep.current)?.number || 1);
-        setViewState("thread");
-    };
+    // Progress tracking
+    const [progress, setProgress] = useState(0);
+    const [videoDuration, setVideoDuration] = useState(0);
+    const [videoLoaded, setVideoLoaded] = useState(false);
+    const [videoEnded, setVideoEnded] = useState(false);
+    const progressInterval = useRef<NodeJS.Timeout | null>(null);
 
-    // Auto-scroll to bottom when messages change
+    // Refs
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Preloading refs (keep videos in memory for instant playback)
+    const preloadRefs = useRef<Record<string, HTMLVideoElement>>({});
+
+    // Find current reel from mock data and preload adjacent reels
     useEffect(() => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        const reel = reels.find(r => r.id === initialReelId);
+        if (!reel) return;
+
+        // Set the current reel and notify parent
+        setCurrentReel(reel);
+        if (onReelChange) {
+            onReelChange(reel.id);
         }
-    }, [messages]);
 
-    // Helper function to get a thread by ID
-    const getThreadById = (threadId) => {
-        return threadsData.find(thread => thread.id === threadId);
-    };
+        // Reset video state
+        setVideoEnded(false);
+        setVideoLoaded(false);
+        setProgress(0);
+        setIsLiked(false);
+        setIsSaved(false);
 
-    // Handle create thread flow
-    const handleCreateThread = (seriesId) => {
-        setCreateThreadState({ step: 1, seriesId, selectedFriends: [] });
-        setViewState("create-thread");
-    };
+        // Find adjacent reels for preloading and navigation hints
+        const adjacentReels: { up?: Reel; down?: Reel; left?: Reel; right?: Reel } = {};
 
-    // Toggle friend selection in create thread flow
-    const toggleFriendSelection = (friend) => {
-        setCreateThreadState(prev => {
-            const friendExists = prev.selectedFriends.some(f => f.id === friend.id);
-            return {
-                ...prev,
-                selectedFriends: friendExists
-                    ? prev.selectedFriends.filter(f => f.id !== friend.id)
-                    : [...prev.selectedFriends, friend]
-            };
-        });
-    };
+        // VERTICAL NAVIGATION - STRICTLY WITHIN SERIES
+        if (reel.seriesId && reel.episodeNumber) {
+            // Get all reels in this series, sorted by episode number
+            const seriesReels = reels
+                .filter(r => r.seriesId === reel.seriesId)
+                .sort((a, b) => (a.episodeNumber || 0) - (b.episodeNumber || 0));
 
-    // Handle going back
-    const handleBack = () => {
-        if (viewState === "thread" || viewState === "create-thread") {
-            setViewState("profile");
-            setSelectedThread(null);
-            setMessages([]);
-            setCreateThreadState({ step: 1, seriesId: null, selectedFriends: [] });
-        } else if (createThreadState.step > 1) {
-            setCreateThreadState(prev => ({ ...prev, step: prev.step - 1 }));
+            if (seriesReels.length > 1) {
+                // Find current index in the series
+                const currentIndex = seriesReels.findIndex(r => r.id === reel.id);
+
+                // Next episode (up)
+                const nextIndex = (currentIndex + 1) % seriesReels.length;
+                adjacentReels.up = seriesReels[nextIndex];
+
+                // Previous episode (down)
+                const prevIndex = (currentIndex - 1 + seriesReels.length) % seriesReels.length;
+                adjacentReels.down = seriesReels[prevIndex];
+
+                // Preload ALL episodes in this series for instant navigation
+                seriesReels.forEach(seriesReel => {
+                    if (seriesReel.id !== reel.id && !preloadRefs.current[seriesReel.id]) {
+                        const preloadVideo = document.createElement('video');
+                        preloadVideo.src = seriesReel.videoUrl;
+                        preloadVideo.muted = true;
+                        preloadVideo.preload = 'auto';
+                        preloadVideo.load();
+                        preloadRefs.current[seriesReel.id] = preloadVideo;
+                    }
+                });
+            }
         }
-    };
 
-    // Simulate typing response
-    const simulateResponse = () => {
-        if (!selectedThread) return;
+        // HORIZONTAL NAVIGATION (different series or related content)
+        // LEFT: Different series or content with similar tags
+        if (reel.seriesId) {
+            // Find different series with similar tags
+            const differentSeries = reels.filter(r =>
+                r.seriesId &&
+                r.seriesId !== reel.seriesId &&
+                r.episodeNumber === 1 && // Start with first episode
+                r.tags.some(tag => reel.tags.includes(tag))
+            );
 
-        // Get random participant who isn't the current user
-        const otherParticipants = selectedThread.participants.filter(p => p.id !== userData.id);
-        if (otherParticipants.length === 0) return;
+            if (differentSeries.length > 0) {
+                // Take the first match for left navigation
+                adjacentReels.left = differentSeries[0];
+            }
+        } else if (reel.alternateVersions && reel.alternateVersions.length > 0) {
+            // If this is a HyperReel with alternates, use those for left/right
+            const currentIndex = reel.alternateVersions.findIndex(id => id === reel.id);
 
-        const randomParticipant = otherParticipants[Math.floor(Math.random() * otherParticipants.length)];
-        const randomResponse = autoResponses[Math.floor(Math.random() * autoResponses.length)];
+            // Next alternate version (left swipe)
+            const nextIndex = (currentIndex + 1) % reel.alternateVersions.length;
+            const nextVersionId = reel.alternateVersions[nextIndex];
+            const nextReel = reels.find(r => r.id === nextVersionId);
+            if (nextReel) {
+                adjacentReels.left = nextReel;
+            }
 
-        // Show typing indicator
-        setIsTyping(true);
+            // Previous alternate version (right swipe)
+            const prevIndex = (currentIndex - 1 + reel.alternateVersions.length) % reel.alternateVersions.length;
+            const prevVersionId = reel.alternateVersions[prevIndex];
+            const prevReel = reels.find(r => r.id === prevVersionId);
+            if (prevReel) {
+                adjacentReels.right = prevReel;
+            }
+        }
 
-        // Simulate typing delay (1-3 seconds)
-        const typingDelay = 1000 + Math.random() * 2000;
+        // RIGHT: If we don't have a right navigation yet, find related content
+        if (!adjacentReels.right && reel.tags && reel.tags.length > 0) {
+            const relatedReels = reels.filter(
+                r => r.id !== reel.id &&
+                    !r.seriesId && // Prefer standalone reels
+                    r.tags.some(tag => reel.tags.includes(tag))
+            );
 
-        setTimeout(() => {
-            setIsTyping(false);
+            if (relatedReels.length > 0) {
+                adjacentReels.right = relatedReels[0];
+            }
+        }
 
-            // Add new message
-            const newMsg = {
-                id: `msg-${Date.now()}`,
-                userId: randomParticipant.id,
-                content: randomResponse,
-                timestamp: "Just now"
-            };
+        // If left is still empty, find any related content by tags
+        if (!adjacentReels.left && reel.tags && reel.tags.length > 0) {
+            const relatedReels = reels.filter(
+                r => r.id !== reel.id &&
+                    r.id !== adjacentReels.right?.id && // Don't use the same reel as right
+                    r.tags.some(tag => reel.tags.includes(tag))
+            );
 
-            setMessages(prev => [...prev, newMsg]);
-        }, typingDelay);
-    };
+            if (relatedReels.length > 0) {
+                adjacentReels.left = relatedReels[0];
+            }
+        }
 
-    // Handle sending a message
-    const handleSendMessage = () => {
-        if (!newMessage.trim() || !selectedThread) return;
+        // Update navigation state
+        setNextReels(adjacentReels);
 
-        // Create new message
-        const newMsg = {
-            id: `msg-${Date.now()}`,
-            userId: userData.id,
-            content: newMessage,
-            timestamp: "Just now"
+    }, [initialReelId, onReelChange]);
+
+    // Check if we're on desktop
+    useEffect(() => {
+        const handleResize = () => {
+            setIsDesktop(window.innerWidth >= 768);
         };
 
-        // Add to messages
-        setMessages(prev => [...prev, newMsg]);
+        handleResize(); // Initial check
+        window.addEventListener('resize', handleResize);
 
-        // Clear input
-        setNewMessage("");
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
 
-        // Trigger response after delay
-        setTimeout(simulateResponse, 500);
+    // Auto-hide controls after 3 seconds of inactivity
+    useEffect(() => {
+        if (showControls) {
+            const timer = setTimeout(() => {
+                if (!showWhatIf && !showInfo && !showKeyboardHelp) {
+                    setShowControls(false);
+                }
+            }, 3000);
+
+            return () => clearTimeout(timer);
+        }
+    }, [showControls, showWhatIf, showInfo, showKeyboardHelp]);
+
+    // Handle video loading, events and instant transitions
+    useEffect(() => {
+        if (!videoRef.current || !currentReel) return;
+
+        const video = videoRef.current;
+
+        // Set video properties
+        video.muted = isMuted;
+        video.loop = true;
+
+        // Clear previous event listeners
+        const cloneNode = video.cloneNode(false) as HTMLVideoElement;
+        if (video.parentNode) {
+            video.parentNode.replaceChild(cloneNode, video);
+        }
+        videoRef.current = cloneNode;
+
+        // Setup event listeners
+        const handleCanPlay = () => {
+            setVideoLoaded(true);
+            setVideoDuration(cloneNode.duration);
+
+            if (isPlaying && !isTransitioning) {
+                // Use Promise syntax for better error handling
+                cloneNode.play().catch(err => {
+                    console.error('Error playing video:', err);
+                    setIsPlaying(false);
+                });
+            }
+        };
+
+        const handleLoadedMetadata = () => {
+            setVideoDuration(cloneNode.duration);
+        };
+
+        const handleTimeUpdate = () => {
+            const currentTime = cloneNode.currentTime;
+            const duration = cloneNode.duration;
+
+            if (duration > 0) {
+                // Update progress percentage
+                setProgress((currentTime / duration) * 100);
+
+                // Detect when video is near the end (90% complete)
+                if (!videoEnded && currentTime >= duration * 0.9) {
+                    setVideoEnded(true);
+                    if (onVideoComplete) {
+                        onVideoComplete();
+                    }
+                }
+            }
+        };
+
+        const handleEnded = () => {
+            // Video has completed a loop, restarting
+            cloneNode.currentTime = 0;
+            cloneNode.play().catch(console.error);
+
+            if (!videoEnded) {
+                setVideoEnded(true);
+                if (onVideoComplete) {
+                    onVideoComplete();
+                }
+            }
+        };
+
+        const handleError = (e: Event) => {
+            console.error('Video error:', e);
+            setVideoLoaded(false);
+
+            // Try to recover with a default video if available
+            if (cloneNode.src !== '/videos/default-video.mp4') {
+                console.log('Attempting to play default video instead');
+                cloneNode.src = '/videos/default-video.mp4';
+                cloneNode.load();
+            }
+        };
+
+        // Add all event listeners
+        cloneNode.addEventListener('canplay', handleCanPlay);
+        cloneNode.addEventListener('loadedmetadata', handleLoadedMetadata);
+        cloneNode.addEventListener('timeupdate', handleTimeUpdate);
+        cloneNode.addEventListener('ended', handleEnded);
+        cloneNode.addEventListener('error', handleError);
+
+        // OPTIMIZED LOADING STRATEGY:
+        // Priority 1: Use preloaded video if available (instant playback)
+        // Priority 2: Set src and load if needed
+        const preloadedVideo = preloadRefs.current[currentReel.id];
+
+        if (preloadedVideo && preloadedVideo.readyState >= 3) {
+            // Use the preloaded video's src - this is much faster than loading again
+            cloneNode.src = preloadedVideo.src;
+
+            // If the preloaded video is fully loaded, we can set state immediately
+            if (preloadedVideo.readyState >= 4) {
+                setVideoLoaded(true);
+                setVideoDuration(preloadedVideo.duration);
+
+                // Start playback immediately
+                if (isPlaying && !isTransitioning) {
+                    cloneNode.play().catch(console.error);
+                }
+            }
+        } else {
+            // No preloaded version, load from scratch
+            cloneNode.src = currentReel.videoUrl;
+            cloneNode.load(); // Explicitly load to start buffering
+        }
+
+        // Clean up function
+        return () => {
+            cloneNode.removeEventListener('canplay', handleCanPlay);
+            cloneNode.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            cloneNode.removeEventListener('timeupdate', handleTimeUpdate);
+            cloneNode.removeEventListener('ended', handleEnded);
+            cloneNode.removeEventListener('error', handleError);
+
+            if (!cloneNode.paused) {
+                cloneNode.pause();
+            }
+
+            // Store this video in preloadRefs if not already there
+            if (!preloadRefs.current[currentReel.id]) {
+                preloadRefs.current[currentReel.id] = cloneNode;
+            }
+        };
+    }, [currentReel, isMuted, isPlaying, isTransitioning, onVideoComplete, videoEnded]);
+
+    // Handle video play/pause state changes
+    useEffect(() => {
+        if (!videoRef.current || !videoLoaded || isTransitioning) return;
+
+        const video = videoRef.current;
+
+        if (isPlaying) {
+            video.play().catch(err => {
+                console.error('Error playing video:', err);
+                setIsPlaying(false);
+            });
+
+            // Start progress tracking
+            if (progressInterval.current) {
+                clearInterval(progressInterval.current);
+            }
+
+            progressInterval.current = setInterval(() => {
+                if (video) {
+                    const currentTime = video.currentTime;
+                    if (videoDuration > 0) {
+                        setProgress((currentTime / videoDuration) * 100);
+                    }
+                }
+            }, 100);
+        } else {
+            video.pause();
+
+            // Stop progress tracking
+            if (progressInterval.current) {
+                clearInterval(progressInterval.current);
+            }
+        }
+
+        return () => {
+            if (progressInterval.current) {
+                clearInterval(progressInterval.current);
+            }
+        };
+    }, [isPlaying, videoLoaded, isTransitioning, videoDuration]);
+
+    // Handle video mute/unmute
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.muted = isMuted;
+        }
+    }, [isMuted]);
+
+    // Reset progress when reel changes
+    useEffect(() => {
+        setProgress(0);
+        if (videoRef.current) {
+            videoRef.current.currentTime = 0;
+        }
+    }, [currentReel]);
+
+    // Add keyboard navigation for desktop
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (isTransitioning) return;
+
+            // Show controls on any key press
+            setShowControls(true);
+
+            switch (e.key) {
+                case 'ArrowUp':
+                    navigateToReel('up');
+                    break;
+                case 'ArrowDown':
+                    navigateToReel('down');
+                    break;
+                case 'ArrowLeft':
+                    navigateToReel('left');
+                    break;
+                case 'ArrowRight':
+                    navigateToReel('right');
+                    break;
+                case ' ': // Space
+                    setIsPlaying(!isPlaying);
+                    break;
+                case 'm':
+                case 'M':
+                    setIsMuted(!isMuted);
+                    break;
+                case 'i':
+                case 'I':
+                    setShowInfo(!showInfo);
+                    break;
+                case 'w':
+                case 'W':
+                    if (currentReel?.whatIfScenarios && currentReel.whatIfScenarios.length > 0) {
+                        setShowWhatIf(!showWhatIf);
+                    }
+                    break;
+                case 'Escape':
+                    if (showWhatIf) setShowWhatIf(false);
+                    if (showInfo) setShowInfo(false);
+                    if (showKeyboardHelp) setShowKeyboardHelp(false);
+                    break;
+                case '?':
+                    setShowKeyboardHelp(!showKeyboardHelp);
+                    break;
+                case 'l':
+                case 'L':
+                    setIsLiked(!isLiked);
+                    break;
+                case 'b':
+                case 'B':
+                    setIsSaved(!isSaved);
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isPlaying, isMuted, showWhatIf, showInfo, showKeyboardHelp, isTransitioning, currentReel, isLiked, isSaved]);
+
+
+    // Navigate between reels based on direction - optimized for instant transitions
+    const navigateToReel = (direction: 'up' | 'down' | 'left' | 'right') => {
+        if (!currentReel || isTransitioning) return;
+
+        // Get next reel from our precomputed directions
+        const nextReel = nextReels[direction];
+        if (!nextReel) return; // Don't navigate if there's no reel in this direction
+
+        // Start transition animation
+        setDirection(direction);
+        setIsTransitioning(true);
+        setShowControls(true);
+
+        // Reset video state
+        setVideoEnded(false);
+        setProgress(0);
+
+        // Close any open overlays
+        setShowWhatIf(false);
+        setShowInfo(false);
+        setShowKeyboardHelp(false);
+
+        // OPTIMIZED TRANSITION:
+        // 1. Play animation for 200ms (shortened from 300ms)
+        // 2. Switch to new reel
+        // 3. Start playing new reel immediately if preloaded
+        setTimeout(() => {
+            if (onReelChange) {
+                onReelChange(nextReel.id);
+            }
+
+            setCurrentReel(nextReel);
+
+            // Quickly reset navigation states
+            setTimeout(() => {
+                setDirection(null);
+                setIsTransitioning(false);
+                setIsPlaying(true);
+            }, 100); // Even shorter delay for snappier UI
+        }, 200); // Shorter animation time for more responsive feel
     };
 
-    // Handle keypress in message input
-    const handleKeyPress = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSendMessage();
+    // Handle swipe gestures with better sensitivity
+    const handlers = useSwipeable({
+        onSwiped: (eventData) => {
+            const { dir } = eventData;
+
+            // Don't process swipes during transitions
+            if (isTransitioning) return;
+
+            // If showing overlays, close them on any swipe
+            if (showWhatIf || showInfo || showKeyboardHelp) {
+                setShowWhatIf(false);
+                setShowInfo(false);
+                setShowKeyboardHelp(false);
+                return;
+            }
+
+            // Map swipe direction to navigation direction (lowercase for consistency)
+            switch (dir.toLowerCase()) {
+                case 'up':
+                    navigateToReel('up');
+                    break;
+                case 'down':
+                    navigateToReel('down');
+                    break;
+                case 'left':
+                    navigateToReel('left');
+                    break;
+                case 'right':
+                    navigateToReel('right');
+                    break;
+            }
+        },
+        preventDefaultTouchmoveEvent: true,
+        trackMouse: false, // Only track on touch devices for better performance
+        delta: 30, // Lower threshold for easier swiping (was 50)
+        swipeDuration: 800, // Allow slightly longer swipes (was 500)
+    });
+
+    const handleVideoClick = () => {
+        if (showWhatIf || showInfo || showKeyboardHelp) {
+            // Close any open overlays
+            setShowWhatIf(false);
+            setShowInfo(false);
+            setShowKeyboardHelp(false);
+        } else {
+            // Toggle playback
+            setIsPlaying(!isPlaying);
+        }
+        // Always show controls when clicking
+        setShowControls(true);
+    };
+
+    const handleThreadOpen = () => {
+        if (currentReel && onThreadOpen) {
+            onThreadOpen(currentReel.id);
         }
     };
 
-    // Get series info by ID
-    const getSeriesById = (seriesId) => {
-        return watchingSeries.find(series => series.id === seriesId);
-    };
+    const toggleWhatIf = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        setShowWhatIf(!showWhatIf);
+        setShowControls(true);
 
-    // Handle episode change
-    const handleEpisodeChange = (episodeNumber) => {
-        // Only allow navigating to unlocked episodes
-        if (selectedThread?.episodes.find(ep => ep.number === episodeNumber)?.locked) {
-            return;
-        }
-
-        setCurrentEpisode(episodeNumber);
-
-        // Update UI to show this episode as current
-        if (selectedThread) {
-            const updatedThread = { ...selectedThread };
-            updatedThread.episodes = updatedThread.episodes.map(ep => ({
-                ...ep,
-                current: ep.number === episodeNumber
-            }));
-            setSelectedThread(updatedThread);
+        // Reset video ended state when opening what-if
+        if (!showWhatIf) {
+            setVideoEnded(false);
         }
     };
 
-    // Generate What-If scenario
-    const generateWhatIf = () => {
-        controls.start({
-            scale: [1, 1.05, 1],
-            transition: { duration: 0.5 }
-        });
-        setShowWhatIf(true);
+    const toggleLike = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        setIsLiked(!isLiked);
+        setShowControls(true);
+
+        // Animate heart effect when liking
+        if (!isLiked) {
+            // Here you could add a heart animation
+        }
     };
 
-    // Render the UI based on current view state
-    return (
-        <div className="min-h-screen bg-background text-foreground font-sans antialiased overflow-hidden">
-            {/* Background gradients */}
-            <div className="fixed inset-0 pointer-events-none z-0 opacity-30">
-                <div className="absolute top-0 left-0 w-96 h-96 rounded-full bg-gradient-to-br from-primary-500 to-primary-800 blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-                <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full bg-gradient-to-tr from-primary-secondary to-primary-800 blur-3xl translate-x-1/3 translate-y-1/3"></div>
+    const toggleSave = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        setIsSaved(!isSaved);
+        setShowControls(true);
+    };
+
+    const toggleMute = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        setIsMuted(!isMuted);
+        setShowControls(true);
+    };
+
+    const toggleInfo = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        setShowInfo(!showInfo);
+        setShowControls(true);
+    };
+
+    const toggleKeyboardHelp = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        setShowKeyboardHelp(!showKeyboardHelp);
+        setShowControls(true);
+    };
+
+    const handleWhatIfSelect = (scenarioId: string) => {
+        // In a real app, you would navigate to the scenario
+        setShowWhatIf(false);
+        setShowControls(true);
+
+        // For now, just close the overlay and show a notification
+        console.log(`Selected scenario ${scenarioId}`);
+    };
+
+    // Get creator info
+    const getCreator = () => {
+        if (!currentReel) return null;
+        return users.find(user => user.id === currentReel.userId);
+    };
+
+    const creator = getCreator();
+
+    // Bail out if no current reel
+    if (!currentReel) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-background">
+                <motion.div
+                    className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                />
             </div>
+        );
+    }
 
-            {/* Header/Navigation */}
-            <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-white/10 px-4 py-3">
-                <div className="flex items-center justify-between">
-                    {viewState !== "profile" ? (
+    // Determine available navigation directions based on current reel
+    const canNavigateUp = Boolean(nextReels.up);
+    const canNavigateDown = Boolean(nextReels.down);
+    const canNavigateLeft = Boolean(nextReels.left);
+    const canNavigateRight = Boolean(nextReels.right);
+
+    return (
+        <div
+            ref={containerRef}
+            className="reel-container h-screen w-full touch-none"
+            {...handlers}
+            onClick={handleVideoClick}
+        >
+            {/* Video Player with Enhanced Transitions */}
+            <div className="relative w-full h-full bg-background">
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={currentReel.id}
+                        className="absolute inset-0"
+                        initial={{
+                            opacity: 0,
+                            scale: direction ? 1 : 0.95,
+                            x: direction === 'right' ? -100 : direction === 'left' ? 100 : 0,
+                            y: direction === 'down' ? -100 : direction === 'up' ? 100 : 0
+                        }}
+                        animate={{
+                            opacity: 1,
+                            scale: 1,
+                            x: 0,
+                            y: 0
+                        }}
+                        exit={{
+                            opacity: 0,
+                            scale: 0.95,
+                            x: direction === 'left' ? -100 : direction === 'right' ? 100 : 0,
+                            y: direction === 'up' ? -100 : direction === 'down' ? 100 : 0
+                        }}
+                        transition={{
+                            type: "spring",
+                            damping: 30,
+                            stiffness: 300,
+                            duration: 0.2
+                        }}
+                    >
+                        {/* Main Video Element */}
+                        <video
+                            ref={videoRef}
+                            className={`w-full h-full object-cover ${videoLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
+                            loop
+                            playsInline
+                            poster={currentReel.thumbnailUrl}
+                            muted={isMuted}
+                        />
+
+                        {/* Loading overlay and thumbnail */}
+                        {!videoLoaded && (
+                            <div className="absolute inset-0 bg-background flex items-center justify-center">
+                                <img
+                                    src={currentReel.thumbnailUrl}
+                                    alt={currentReel.title}
+                                    className="w-full h-full object-cover opacity-50"
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <motion.div
+                                        className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full"
+                                        animate={{ rotate: 360 }}
+                                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </motion.div>
+                </AnimatePresence>
+
+                {/* Episode indicator at the top */}
+                <EpisodeIndicator
+                    currentReelId={currentReel.id}
+                    visible={showControls || videoEnded}
+                />
+
+                {/* Overlay with controls and info */}
+                <div
+                    className={`absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/80 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setShowControls(true);
+                    }}
+                >
+                    {/* Top Bar */}
+                    <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                            <div className="bg-primary/80 backdrop-blur-sm rounded-full px-4 py-1 text-sm">
+                                {currentReel.type === 'hyper' ? 'HyperReel' : currentReel.episodeNumber ? `Episode ${currentReel.episodeNumber}` : 'Featured'}
+                            </div>
+
+                            {currentReel.seriesId && (
+                                <div className="bg-black/50 backdrop-blur-sm rounded-full px-3 py-1 text-xs">
+                                    Series
+                                </div>
+                            )}
+                        </div>
+
+                        {/* App logo/name */}
+                        <motion.div
+                            className="flex items-center"
+                            whileHover={{ scale: 1.05 }}
+                        >
+                            <div className="w-8 h-8 bg-gradient-to-r from-primary to-primary-secondary rounded-full mr-2 flex items-center justify-center text-white font-bold">
+                                K
+                            </div>
+                            <span className="font-bold">KnowScroll</span>
+                        </motion.div>
+                    </div>
+
+                    {/* Bottom Info */}
+                    <div className="absolute bottom-20 md:bottom-8 left-4 right-20">
+                        <h2 className="text-xl md:text-2xl font-bold mb-1">{currentReel.title}</h2>
+                        <p className="text-sm text-gray-200 mb-2 line-clamp-2">{currentReel.description}</p>
+
+                        {/* Tags */}
+                        <div className="flex flex-wrap gap-2 mb-2">
+                            {currentReel.tags.slice(0, 3).map((tag, index) => (
+                                <motion.span
+                                    key={index}
+                                    className="text-xs bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full"
+                                    whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.2)" }}
+                                >
+                                    {tag}
+                                </motion.span>
+                            ))}
+                        </div>
+
+                        {/* Creator Info */}
+                        {creator && (
+                            <motion.div
+                                className="flex items-center"
+                                whileHover={{ x: 3 }}
+                            >
+                                <div className="w-8 h-8 rounded-full bg-primary/30 mr-2 flex items-center justify-center">
+                                    <span className="text-sm font-semibold">{creator.name.charAt(0)}</span>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold">{creator.name}</p>
+                                    <p className="text-xs text-gray-300">@{creator.username}</p>
+                                </div>
+                            </motion.div>
+                        )}
+                    </div>
+
+                    {/* Right Side Controls */}
+                    <div className="absolute right-4 bottom-24 md:bottom-28 flex flex-col items-center space-y-4">
                         <motion.button
-                            onClick={handleBack}
-                            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center"
-                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.1)" }}
+                            className={`w-12 h-12 flex items-center justify-center ${isLiked ? 'bg-red-500' : 'bg-white/20'} backdrop-blur-sm rounded-full transition-colors duration-300`}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={toggleLike}
+                        >
+                            <FaHeart className={`text-xl ${isLiked ? 'text-white' : 'text-white'}`} />
+                            <motion.span
+                                className="absolute -bottom-5 text-xs"
+                                animate={{ scale: isLiked ? [1, 1.5, 1] : 1 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                {isLiked ? (currentReel.likes + 1).toLocaleString() : currentReel.likes.toLocaleString()}
+                            </motion.span>
+                        </motion.button>
+
+                        <motion.button
+                            className="w-12 h-12 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full"
+                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.3)" }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={handleThreadOpen}
+                        >
+                            <FaComment className="text-xl text-white" />
+                            <span className="absolute -bottom-5 text-xs">Chat</span>
+                        </motion.button>
+
+                        <motion.button
+                            className="w-12 h-12 flex items-center justify-center bg-white/20 backdrop-blur-sm rounded-full"
+                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.3)" }}
                             whileTap={{ scale: 0.9 }}
                         >
-                            <FaArrowLeft />
+                            <FaShare className="text-xl text-white" />
+                            <span className="absolute -bottom-5 text-xs">Share</span>
                         </motion.button>
-                    ) : (
-                        <motion.div
-                            className="w-10 h-10 rounded-full bg-gradient-to-r from-primary to-primary-secondary flex items-center justify-center"
-                            whileHover={{ scale: 1.1, boxShadow: "0 0 15px rgba(143, 70, 193, 0.5)" }}
+
+                        <motion.button
+                            className={`w-12 h-12 flex items-center justify-center ${isSaved ? 'bg-primary' : 'bg-white/20'} backdrop-blur-sm rounded-full transition-colors duration-300`}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={toggleSave}
                         >
-                            <FaUser />
+                            <FaBookmark className={`text-xl ${isSaved ? 'text-white' : 'text-white'}`} />
+                            <span className="absolute -bottom-5 text-xs">Save</span>
+                        </motion.button>
+
+                        {currentReel.whatIfScenarios && currentReel.whatIfScenarios.length > 0 && (
+                            <motion.button
+                                className={`w-12 h-12 flex items-center justify-center ${showWhatIf ? 'bg-primary' : 'bg-white/20'} backdrop-blur-sm rounded-full transition-colors duration-300`}
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={toggleWhatIf}
+                            >
+                                <FaLightbulb className="text-xl text-white" />
+                                <span className="absolute -bottom-5 text-xs">What If</span>
+                            </motion.button>
+                        )}
+                    </div>
+
+                    {/* Video Controls Overlay - Bottom */}
+                    <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center space-x-3">
+                        <motion.button
+                            className="w-10 h-10 flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-full"
+                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsPlaying(!isPlaying);
+                            }}
+                        >
+                            {isPlaying ? <FaPause className="text-lg" /> : <FaPlay className="text-lg" />}
+                        </motion.button>
+
+                        <motion.button
+                            className="w-10 h-10 flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-full"
+                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={toggleMute}
+                        >
+                            {isMuted ? <FaVolumeMute className="text-lg" /> : <FaVolumeUp className="text-lg" />}
+                        </motion.button>
+
+                        <div className="flex-1 mx-1">
+                            <div className="relative h-1.5 bg-white/20 rounded-full overflow-hidden">
+                                <motion.div
+                                    className="absolute h-full bg-primary rounded-full"
+                                    style={{ width: `${progress}%` }}
+                                    initial={{ width: '0%' }}
+                                    animate={{ width: `${progress}%` }}
+                                    transition={{ duration: 0.1 }}
+                                />
+                            </div>
+                        </div>
+
+                        <motion.button
+                            className="w-10 h-10 flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-full"
+                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={toggleInfo}
+                        >
+                            <FaInfoCircle className="text-lg" />
+                        </motion.button>
+
+                        {isDesktop && (
+                            <motion.button
+                                className="w-10 h-10 flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-full hidden md:flex"
+                                whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={toggleKeyboardHelp}
+                            >
+                                <FaKeyboard className="text-lg" />
+                            </motion.button>
+                        )}
+                    </div>
+
+                    {/* Desktop Arrow Controls with Enhanced UI - only show when enabled */}
+                    {showArrows && isDesktop && (
+                        <>
+                            {/* Next Episode (Up) Arrow */}
+                            {canNavigateUp && (
+                                <motion.button
+                                    className="absolute top-24 left-1/2 transform -translate-x-1/2 w-14 h-14 rounded-full bg-gradient-to-b from-primary/30 to-black/60 backdrop-blur-md flex items-center justify-center border border-primary/30 hidden md:flex z-20"
+                                    initial={{ y: 0, opacity: 0.8 }}
+                                    animate={{
+                                        y: [0, -10, 0],
+                                        opacity: [0.8, 1, 0.8]
+                                    }}
+                                    transition={{
+                                        duration: 3,
+                                        repeat: Infinity,
+                                        repeatType: "reverse"
+                                    }}
+                                    whileHover={{
+                                        scale: 1.1,
+                                        backgroundColor: "rgba(143, 70, 193, 0.4)",
+                                        boxShadow: "0 0 20px rgba(143, 70, 193, 0.4)"
+                                    }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigateToReel('up');
+                                    }}
+                                >
+                                    <FaArrowUp className="text-xl text-white" />
+                                </motion.button>
+                            )}
+
+                            {/* Previous Episode (Down) Arrow */}
+                            {canNavigateDown && (
+                                <motion.button
+                                    className="absolute bottom-28 left-1/2 transform -translate-x-1/2 w-14 h-14 rounded-full bg-gradient-to-t from-primary/30 to-black/60 backdrop-blur-md flex items-center justify-center border border-primary/30 hidden md:flex z-20"
+                                    initial={{ y: 0, opacity: 0.8 }}
+                                    animate={{
+                                        y: [0, 10, 0],
+                                        opacity: [0.8, 1, 0.8]
+                                    }}
+                                    transition={{
+                                        duration: 3,
+                                        repeat: Infinity,
+                                        repeatType: "reverse",
+                                        delay: 0.5
+                                    }}
+                                    whileHover={{
+                                        scale: 1.1,
+                                        backgroundColor: "rgba(143, 70, 193, 0.4)",
+                                        boxShadow: "0 0 20px rgba(143, 70, 193, 0.4)"
+                                    }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigateToReel('down');
+                                    }}
+                                >
+                                    <FaArrowDown className="text-xl text-white" />
+                                </motion.button>
+                            )}
+
+                            {/* Left (Different Series) Arrow */}
+                            {canNavigateLeft && (
+                                <motion.button
+                                    className="absolute top-1/2 left-10 transform -translate-y-1/2 w-14 h-14 rounded-full bg-gradient-to-r from-primary/30 to-black/60 backdrop-blur-md flex items-center justify-center border border-primary/30 hidden md:flex z-20"
+                                    initial={{ x: 0, opacity: 0.8 }}
+                                    animate={{
+                                        x: [0, -10, 0],
+                                        opacity: [0.8, 1, 0.8]
+                                    }}
+                                    transition={{
+                                        duration: 3,
+                                        repeat: Infinity,
+                                        repeatType: "reverse",
+                                        delay: 1
+                                    }}
+                                    whileHover={{
+                                        scale: 1.1,
+                                        backgroundColor: "rgba(143, 70, 193, 0.4)",
+                                        boxShadow: "0 0 20px rgba(143, 70, 193, 0.4)"
+                                    }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigateToReel('left');
+                                    }}
+                                >
+                                    <FaArrowLeft className="text-xl text-white" />
+                                </motion.button>
+                            )}
+
+                            {/* Right (Related Content) Arrow */}
+                            {canNavigateRight && (
+                                <motion.button
+                                    className="absolute top-1/2 right-10 transform -translate-y-1/2 w-14 h-14 rounded-full bg-gradient-to-l from-primary/30 to-black/60 backdrop-blur-md flex items-center justify-center border border-primary/30 hidden md:flex z-20"
+                                    initial={{ x: 0, opacity: 0.8 }}
+                                    animate={{
+                                        x: [0, 10, 0],
+                                        opacity: [0.8, 1, 0.8]
+                                    }}
+                                    transition={{
+                                        duration: 3,
+                                        repeat: Infinity,
+                                        repeatType: "reverse",
+                                        delay: 1.5
+                                    }}
+                                    whileHover={{
+                                        scale: 1.1,
+                                        backgroundColor: "rgba(143, 70, 193, 0.4)",
+                                        boxShadow: "0 0 20px rgba(143, 70, 193, 0.4)"
+                                    }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigateToReel('right');
+                                    }}
+                                >
+                                    <FaArrowRight className="text-xl text-white" />
+                                </motion.button>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {/* Swipe Direction Indicators - Only show during transition */}
+                <AnimatePresence>
+                    {direction && (
+                        <motion.div
+                            className="absolute inset-0 pointer-events-none flex items-center justify-center bg-black/20 backdrop-blur-sm"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 0.7 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            <motion.div
+                                className="w-20 h-20 rounded-full bg-primary/30 backdrop-blur-md flex items-center justify-center"
+                                initial={{ scale: 0.8, opacity: 0.5 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 1.2, opacity: 0 }}
+                            >
+                                {direction === 'up' && <FaArrowUp className="text-4xl text-white" />}
+                                {direction === 'down' && <FaArrowDown className="text-4xl text-white" />}
+                                {direction === 'left' && <FaArrowLeft className="text-4xl text-white" />}
+                                {direction === 'right' && <FaArrowRight className="text-4xl text-white" />}
+                            </motion.div>
                         </motion.div>
                     )}
+                </AnimatePresence>
 
-                    <motion.h1
-                        className="text-xl font-semibold"
-                        animate={{ opacity: 1, y: 0 }}
-                        initial={{ opacity: 0, y: -10 }}
-                    >
-                        {viewState === "profile" ? "Profile" :
-                            viewState === "thread" ?
+                {/* Mobile Navigation Hints - Only visible when video ends (handled by separate component) */}
+
+                {/* What If Scenarios Overlay */}
+                {currentReel.whatIfScenarios && (
+                    <WhatIfOverlay
+                        scenarios={currentReel.whatIfScenarios}
+                        isVisible={showWhatIf}
+                        onClose={() => setShowWhatIf(false)}
+                        onSelectScenario={handleWhatIfSelect}
+                    />
+                )}
+
+                {/* Info Modal */}
+                <AnimatePresence>
+                    {showInfo && (
+                        <motion.div
+                            className="absolute inset-0 bg-black/80 backdrop-blur-md p-6 z-20"
+                            initial={{ opacity: 0, y: 50 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 50 }}
+                            transition={{ duration: 0.3 }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowInfo(false);
+                            }}
+                        >
+                            <div className="flex justify-between items-center mb-6">
                                 <div className="flex items-center">
-                                    <span>{selectedThread?.title}</span>
-                                    {selectedThread &&
-                                        <div className="ml-2 px-2 py-0.5 bg-primary/20 rounded-full text-xs">
-                                            Ep {currentEpisode}
-                                        </div>
-                                    }
-                                </div> :
-                                viewState === "create-thread" ? "New Thread" : ""}
-                    </motion.h1>
+                                    <FaInfoCircle className="text-primary-light text-xl mr-2" />
+                                    <h3 className="text-2xl font-bold">{currentReel.title}</h3>
+                                </div>
 
-                    <div className="flex items-center space-x-2">
-                        <motion.button
-                            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center relative"
-                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.1)" }}
-                            whileTap={{ scale: 0.9 }}
-                        >
-                            <FaBell />
-                            <motion.div
-                                className="absolute -top-1 -right-1 w-3 h-3 bg-primary-secondary rounded-full"
-                                animate={{ scale: [1, 1.2, 1] }}
-                                transition={{ duration: 2, repeat: Infinity }}
-                            />
-                        </motion.button>
-                        <motion.button
-                            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center"
-                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.1)" }}
-                            whileTap={{ scale: 0.9 }}
-                        >
-                            <FaSearch />
-                        </motion.button>
-                    </div>
-                </div>
-            </header>
+                                <motion.button
+                                    className="w-8 h-8 flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-full"
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowInfo(false);
+                                    }}
+                                >
+                                    ✕
+                                </motion.button>
+                            </div>
 
-            <AnimatePresence mode="wait">
-                <motion.main
-                    key={viewState}
-                    variants={pageVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    className="pb-20"
-                >
-                    {/* Profile View */}
-                    {viewState === "profile" && (
-                        <div className="px-4 py-6">
-                            {/* User Info */}
-                            <motion.div
-                                className="mb-6"
-                                variants={staggerContainer}
-                                initial="hidden"
-                                animate="show"
-                            >
-                                <motion.div className="flex items-center" variants={staggerItem}>
-                                    <div className="relative">
-                                        <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-primary glass-card">
-                                            <img
-                                                src={userData.avatar}
-                                                alt={userData.name}
-                                                className="w-full h-full object-cover"
-                                            />
+                            <div className="overflow-y-auto max-h-[calc(100vh-150px)]">
+                                {/* Series Info */}
+                                {currentReel.seriesId && currentReel.episodeNumber && (
+                                    <div className="mb-6 bg-white/5 backdrop-blur-sm rounded-xl p-4">
+                                        <div className="flex items-center mb-2">
+                                            <div className="px-3 py-1 bg-primary/30 rounded-full text-xs mr-2">
+                                                Series
+                                            </div>
+                                            <h4 className="font-semibold">
+                                                Episode {currentReel.episodeNumber} of {
+                                                    reels.filter(r => r.seriesId === currentReel.seriesId).length
+                                                }
+                                            </h4>
                                         </div>
-                                        <motion.div
-                                            className="absolute bottom-0 right-0 w-5 h-5 bg-green-500 rounded-full border-2 border-background"
-                                            animate={{ scale: [1, 1.2, 1] }}
-                                            transition={{ duration: 1.5, repeat: Infinity }}
-                                        ></motion.div>
+                                        <p className="text-sm text-white/70 mb-2">
+                                            Part of a multi-episode series. Swipe up/down to navigate between episodes.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Main Content */}
+                                <div className="mb-6">
+                                    <p className="text-white/90 text-base mb-6">{currentReel.description}</p>
+
+                                    <div className="grid grid-cols-2 gap-4 mb-6">
+                                        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3">
+                                            <p className="text-xs text-white/70 mb-1">Views</p>
+                                            <p className="font-semibold">{currentReel.views.toLocaleString()}</p>
+                                        </div>
+                                        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3">
+                                            <p className="text-xs text-white/70 mb-1">Likes</p>
+                                            <p className="font-semibold">{currentReel.likes.toLocaleString()}</p>
+                                        </div>
+                                        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3">
+                                            <p className="text-xs text-white/70 mb-1">Duration</p>
+                                            <p className="font-semibold">{Math.floor(currentReel.duration / 60)}:{(currentReel.duration % 60).toString().padStart(2, '0')}</p>
+                                        </div>
+                                        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3">
+                                            <p className="text-xs text-white/70 mb-1">Published</p>
+                                            <p className="font-semibold">{new Date(currentReel.createdAt).toLocaleDateString()}</p>
+                                        </div>
                                     </div>
 
-                                    <div className="ml-4 flex-1">
-                                        <h2 className="text-xl font-bold">{userData.name}</h2>
-                                        <p className="text-white/60 text-sm">{userData.username}</p>
-                                        <p className="text-sm mt-1">{userData.bio}</p>
+                                    <h4 className="font-semibold mb-2">Tags</h4>
+                                    <div className="flex flex-wrap gap-2 mb-6">
+                                        {currentReel.tags.map((tag, index) => (
+                                            <motion.span
+                                                key={index}
+                                                className="text-sm bg-white/10 backdrop-blur-sm px-3 py-1 rounded-full"
+                                                whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.2)" }}
+                                            >
+                                                {tag}
+                                            </motion.span>
+                                        ))}
                                     </div>
-                                </motion.div>
+                                </div>
 
-                                {/* Stats */}
-                                <motion.div
-                                    className="grid grid-cols-3 gap-4 mt-6"
-                                    variants={staggerItem}
-                                >
-                                    <motion.div
-                                        className="glass-card bg-white/5 rounded-xl p-3 text-center"
-                                        whileHover={{ y: -5, backgroundColor: "rgba(255,255,255,0.1)" }}
-                                    >
-                                        <motion.p
-                                            className="text-primary-light text-xl font-bold"
-                                            animate={{ scale: [1, 1.1, 1] }}
-                                            transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
-                                        >
-                                            {userData.followers}
-                                        </motion.p>
-                                        <p className="text-sm text-white/60">Followers</p>
-                                    </motion.div>
-                                    <motion.div
-                                        className="glass-card bg-white/5 rounded-xl p-3 text-center"
-                                        whileHover={{ y: -5, backgroundColor: "rgba(255,255,255,0.1)" }}
-                                    >
-                                        <p className="text-primary-light text-xl font-bold">{userData.following}</p>
-                                        <p className="text-sm text-white/60">Following</p>
-                                    </motion.div>
-                                    <motion.div
-                                        className="glass-card bg-white/5 rounded-xl p-3 text-center"
-                                        whileHover={{ y: -5, backgroundColor: "rgba(255,255,255,0.1)" }}
-                                    >
-                                        <p className="text-primary-light text-xl font-bold">{userData.activity.threads}</p>
-                                        <p className="text-sm text-white/60">Threads</p>
-                                    </motion.div>
-                                </motion.div>
-                            </motion.div>
-
-                            {/* User Activity */}
-                            <motion.div
-                                className="mb-8"
-                                variants={staggerContainer}
-                                initial="hidden"
-                                animate="show"
-                            >
-                                <motion.h3
-                                    className="text-lg font-semibold mb-4"
-                                    variants={staggerItem}
-                                >
-                                    Activity
-                                </motion.h3>
-                                <motion.div
-                                    className="grid grid-cols-3 gap-4"
-                                    variants={staggerItem}
-                                >
-                                    <motion.div
-                                        className="glass-card bg-white/5 rounded-xl p-4"
-                                        whileHover={{
-                                            y: -5,
-                                            backgroundColor: "rgba(255,255,255,0.1)",
-                                            boxShadow: "0 10px 15px -3px rgba(143, 70, 193, 0.1)"
-                                        }}
-                                    >
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary-400/30 flex items-center justify-center mb-2">
-                                            <FaVideo className="text-primary-light" />
-                                        </div>
-                                        <p className="text-xl font-bold">{userData.activity.views}</p>
-                                        <p className="text-sm text-white/60">Watched</p>
-                                    </motion.div>
-                                    <motion.div
-                                        className="glass-card bg-white/5 rounded-xl p-4"
-                                        whileHover={{
-                                            y: -5,
-                                            backgroundColor: "rgba(255,255,255,0.1)",
-                                            boxShadow: "0 10px 15px -3px rgba(143, 70, 193, 0.1)"
-                                        }}
-                                    >
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary-400/30 flex items-center justify-center mb-2">
-                                            <FaComment className="text-primary-light" />
-                                        </div>
-                                        <p className="text-xl font-bold">{userData.activity.threads}</p>
-                                        <p className="text-sm text-white/60">Threads</p>
-                                    </motion.div>
-                                    <motion.div
-                                        className="glass-card bg-white/5 rounded-xl p-4"
-                                        whileHover={{
-                                            y: -5,
-                                            backgroundColor: "rgba(255,255,255,0.1)",
-                                            boxShadow: "0 10px 15px -3px rgba(143, 70, 193, 0.1)"
-                                        }}
-                                    >
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary-400/30 flex items-center justify-center mb-2">
-                                            <FaShareAlt className="text-primary-light" />
-                                        </div>
-                                        <p className="text-xl font-bold">{userData.activity.contributions}</p>
-                                        <p className="text-sm text-white/60">Shared</p>
-                                    </motion.div>
-                                </motion.div>
-                            </motion.div>
-
-                            {/* Watching Series */}
-                            <motion.div
-                                className="mb-8"
-                                variants={staggerContainer}
-                                initial="hidden"
-                                animate="show"
-                            >
-                                <motion.div
-                                    className="flex justify-between items-center mb-4"
-                                    variants={staggerItem}
-                                >
-                                    <h3 className="text-lg font-semibold">Watching</h3>
-                                    <button className="text-sm text-primary-light">See All</button>
-                                </motion.div>
-
-                                <motion.div
-                                    className="space-y-4"
-                                    variants={staggerItem}
-                                >
-                                    {watchingSeries.map((series, index) => (
-                                        <motion.div
-                                            key={series.id}
-                                            className="glass-card bg-white/5 rounded-xl overflow-hidden"
-                                            whileHover={{
-                                                y: -5,
-                                                backgroundColor: "rgba(255,255,255,0.1)",
-                                                boxShadow: "0 10px 20px -5px rgba(143, 70, 193, 0.2)"
-                                            }}
-                                            initial={{ opacity: 0, y: 20 }}
-                                            animate={{
-                                                opacity: 1,
-                                                y: 0,
-                                                transition: { delay: index * 0.1 }
-                                            }}
-                                        >
-                                            <div className="flex">
-                                                <div className="w-24 h-24 bg-gray-800 flex-shrink-0 relative overflow-hidden">
-                                                    <img
-                                                        src={series.thumbnailUrl}
-                                                        alt={series.title}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                    <div className="absolute inset-0 bg-gradient-to-br opacity-60 mix-blend-overlay"
-                                                        style={{ background: `linear-gradient(to bottom right, var(--primary), var(--primary-secondary))` }}
-                                                    ></div>
-                                                </div>
-                                                <div className="p-3 flex-1">
-                                                    <div className="flex justify-between">
-                                                        <h4 className="font-semibold">{series.title}</h4>
-                                                        <motion.button
-                                                            onClick={() => handleCreateThread(series.id)}
-                                                            className="w-8 h-8 rounded-full bg-primary/20 hover:bg-primary/30 flex items-center justify-center"
-                                                            whileHover={{ scale: 1.1, backgroundColor: "rgba(143, 70, 193, 0.4)" }}
-                                                            whileTap={{ scale: 0.9 }}
-                                                        >
-                                                            <FaShareAlt className="text-xs" />
-                                                        </motion.button>
-                                                    </div>
-                                                    <p className="text-sm text-white/60">{series.progress} of {series.episodes} episodes</p>
-                                                    <div className="w-full h-1 bg-white/10 rounded-full mt-2 overflow-hidden">
-                                                        <motion.div
-                                                            className="h-full bg-gradient-to-r from-primary to-primary-secondary rounded-full"
-                                                            style={{ width: `${(series.progress / series.episodes) * 100}%` }}
-                                                            initial={{ width: 0 }}
-                                                            animate={{ width: `${(series.progress / series.episodes) * 100}%` }}
-                                                            transition={{ duration: 1, delay: index * 0.2 }}
-                                                        ></motion.div>
-                                                    </div>
-                                                    <div className="flex flex-wrap gap-1 mt-2">
-                                                        {series.tags.map((tag, idx) => (
-                                                            <span
-                                                                key={idx}
-                                                                className="text-xs px-2 py-0.5 bg-white/10 rounded-full"
-                                                            >
-                                                                {tag}
-                                                            </span>
-                                                        ))}
-                                                    </div>
+                                {/* Creator Info */}
+                                {creator && (
+                                    <div className="mb-6 bg-white/5 backdrop-blur-sm rounded-xl p-4">
+                                        <h4 className="font-semibold mb-3">Creator</h4>
+                                        <div className="flex items-center">
+                                            <div className="w-12 h-12 rounded-full bg-primary/30 mr-3 flex items-center justify-center">
+                                                <span className="text-lg font-semibold">{creator.name.charAt(0)}</span>
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold">{creator.name}</p>
+                                                <p className="text-sm text-white/70">@{creator.username}</p>
+                                                <div className="mt-1">
+                                                    <motion.button
+                                                        className="text-xs bg-primary/30 hover:bg-primary/50 rounded-full px-3 py-1"
+                                                        whileHover={{ scale: 1.05 }}
+                                                        whileTap={{ scale: 0.95 }}
+                                                    >
+                                                        Follow
+                                                    </motion.button>
                                                 </div>
                                             </div>
-                                        </motion.div>
-                                    ))}
-                                </motion.div>
-                            </motion.div>
+                                        </div>
+                                    </div>
+                                )}
 
-                            {/* Threads Section */}
-                            <motion.div
-                                variants={staggerContainer}
-                                initial="hidden"
-                                animate="show"
-                            >
-                                <motion.h3
-                                    className="text-lg font-semibold mb-4"
-                                    variants={staggerItem}
-                                >
-                                    Discussion Threads
-                                </motion.h3>
-
-                                <motion.div
-                                    className="space-y-4"
-                                    variants={staggerItem}
-                                >
-                                    {threadsData.map((thread, index) => (
-                                        <motion.div
-                                            key={thread.id}
-                                            className="glass-card bg-white/5 rounded-xl p-4"
-                                            whileHover={{
-                                                y: -5,
-                                                backgroundColor: "rgba(255,255,255,0.1)",
-                                                boxShadow: "0 10px 20px -5px rgba(143, 70, 193, 0.2)"
-                                            }}
-                                            onClick={() => handleSelectThread(thread.id)}
-                                            initial={{ opacity: 0, y: 20 }}
-                                            animate={{
-                                                opacity: 1,
-                                                y: 0,
-                                                transition: { delay: 0.3 + index * 0.1 }
-                                            }}
-                                        >
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h4 className="font-semibold">{thread.title}</h4>
-                                                    <div className="flex items-center text-sm text-white/60">
-                                                        <span>{thread.messages.length} messages</span>
-                                                        {thread.episodes && (
-                                                            <span className="ml-2 px-2 py-0.5 bg-primary/20 rounded-full text-xs">
-                                                                {thread.episodes.filter(ep => ep.viewed).length}/{thread.episodes.length} eps
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex -space-x-2">
-                                                    {thread.participants.slice(0, 3).map(participant => (
-                                                        <div
-                                                            key={participant.id}
-                                                            className="w-8 h-8 rounded-full border-2 border-background overflow-hidden"
-                                                        >
+                                {/* Related Content */}
+                                {currentReel.tags && currentReel.tags.length > 0 && (
+                                    <div className="mb-6">
+                                        <h4 className="font-semibold mb-3">Related Content</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {reels
+                                                .filter(r =>
+                                                    r.id !== currentReel.id &&
+                                                    r.tags.some(tag => currentReel.tags.includes(tag))
+                                                )
+                                                .slice(0, 4)
+                                                .map(relatedReel => (
+                                                    <motion.div
+                                                        key={relatedReel.id}
+                                                        className="bg-white/5 backdrop-blur-sm rounded-xl p-3 flex items-center cursor-pointer"
+                                                        whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.1)" }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setShowInfo(false);
+                                                            if (onReelChange) {
+                                                                onReelChange(relatedReel.id);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <div className="w-16 h-16 rounded-lg bg-gray-800 mr-3 flex-shrink-0 overflow-hidden">
                                                             <img
-                                                                src={participant.avatar}
-                                                                alt={participant.name}
+                                                                src={relatedReel.thumbnailUrl}
+                                                                alt={relatedReel.title}
                                                                 className="w-full h-full object-cover"
                                                             />
                                                         </div>
-                                                    ))}
-                                                    {thread.participants.length > 3 && (
-                                                        <div className="w-8 h-8 rounded-full bg-primary/30 border-2 border-background flex items-center justify-center text-xs">
-                                                            +{thread.participants.length - 3}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Latest message preview */}
-                                            <motion.div
-                                                className="mt-3 p-3 bg-white/5 rounded-lg relative overflow-hidden"
-                                                initial={{ height: 0, opacity: 0 }}
-                                                animate={{ height: 'auto', opacity: 1 }}
-                                                transition={{ delay: 0.5 + index * 0.1 }}
-                                            >
-                                                {/* Shimmer effect */}
-                                                <motion.div
-                                                    className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/5 to-transparent"
-                                                    initial={{ x: -200, opacity: 0 }}
-                                                    animate={{ x: 400, opacity: 1 }}
-                                                    transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                                                />
-
-                                                <div className="flex items-center mb-1">
-                                                    <div className="w-5 h-5 rounded-full overflow-hidden mr-2">
-                                                        <img
-                                                            src={thread.participants.find(p => p.id === thread.messages[thread.messages.length - 1].userId)?.avatar}
-                                                            alt=""
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    </div>
-                                                    <p className="text-xs text-white/60">
-                                                        {thread.participants.find(p => p.id === thread.messages[thread.messages.length - 1].userId)?.name} · {thread.messages[thread.messages.length - 1].timestamp}
-                                                    </p>
-                                                </div>
-                                                <p className="text-sm line-clamp-2 relative z-10">
-                                                    {thread.messages[thread.messages.length - 1].content}
-                                                </p>
-                                                {thread.messages[thread.messages.length - 1].episodeRef && (
-                                                    <motion.div
-                                                        className="mt-2 flex items-center text-xs bg-primary/20 rounded-lg p-2"
-                                                        whileHover={{ backgroundColor: "rgba(143, 70, 193, 0.3)" }}
-                                                    >
-                                                        <FaPlay className="mr-2 text-primary-light" />
-                                                        <span>
-                                                            Episode {thread.messages[thread.messages.length - 1].episodeRef.number}: {thread.messages[thread.messages.length - 1].episodeRef.timestamp}
-                                                        </span>
-                                                    </motion.div>
-                                                )}
-                                            </motion.div>
-                                        </motion.div>
-                                    ))}
-                                </motion.div>
-                            </motion.div>
-                        </div>
-                    )}
-
-                    {/* Thread View */}
-                    {viewState === "thread" && selectedThread && (
-                        <div className="h-[calc(100vh-128px)] flex flex-col">
-                            {/* Episodes Navigation */}
-                            <div className="px-4 py-3 border-b border-white/10">
-                                <p className="text-sm text-white/60 mb-2">Episodes</p>
-                                <div className="flex space-x-3 overflow-x-auto pb-2">
-                                    {selectedThread.episodes.map((episode, index) => (
-                                        <motion.div
-                                            key={episode.number}
-                                            className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden relative ${episode.locked ? 'grayscale' : ''} ${episode.current ? 'ring-2 ring-primary' : episode.viewed ? 'opacity-80' : 'opacity-50'}`}
-                                            whileHover={!episode.locked ? {
-                                                scale: 1.05,
-                                                boxShadow: "0 10px 15px -3px rgba(143, 70, 193, 0.3)"
-                                            } : {}}
-                                            whileTap={!episode.locked ? { scale: 0.95 } : {}}
-                                            onClick={() => handleEpisodeChange(episode.number)}
-                                            initial={{ opacity: 0, y: 20 }}
-                                            animate={{
-                                                opacity: episode.locked ? 0.5 : 1,
-                                                y: 0,
-                                                transition: { delay: index * 0.1 }
-                                            }}
-                                        >
-                                            <img
-                                                src={episode.thumbnailUrl}
-                                                alt={`Episode ${episode.number}`}
-                                                className="w-full h-full object-cover"
-                                            />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-                                            <div className="absolute bottom-1 left-1 text-xs font-bold">{episode.number}</div>
-
-                                            {episode.viewed && (
-                                                <motion.div
-                                                    className="absolute top-1 right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center"
-                                                    initial={{ scale: 0 }}
-                                                    animate={{ scale: 1 }}
-                                                    transition={{ delay: 0.3 + index * 0.1 }}
-                                                >
-                                                    <FaCheck className="text-[8px]" />
-                                                </motion.div>
-                                            )}
-
-                                            {episode.locked && (
-                                                <motion.div
-                                                    className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center"
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 0.7 }}
-                                                    transition={{ delay: 0.3 + index * 0.1 }}
-                                                >
-                                                    <FaLock className="text-white/80" />
-                                                </motion.div>
-                                            )}
-
-                                            {episode.current && (
-                                                <motion.div
-                                                    className="absolute bottom-1 right-1 text-xs font-bold bg-primary/80 rounded-full px-1.5 py-0.5"
-                                                    initial={{ scale: 0 }}
-                                                    animate={{ scale: 1 }}
-                                                    transition={{ delay: 0.3 }}
-                                                >
-                                                    {episode.duration}
-                                                </motion.div>
-                                            )}
-                                        </motion.div>
-                                    ))}
-                                </div>
-
-                                {/* Episode Progress */}
-                                <div className="mt-3 flex items-center justify-between px-1">
-                                    <span className="text-xs text-white/60">Progress</span>
-                                    <div className="w-48 h-1 bg-white/10 rounded-full overflow-hidden">
-                                        <motion.div
-                                            className="h-full bg-gradient-to-r from-primary to-primary-secondary"
-                                            initial={{ width: 0 }}
-                                            animate={{ width: `${(selectedThread.episodes.filter(ep => ep.viewed).length / selectedThread.episodes.length) * 100}%` }}
-                                            transition={{ duration: 1 }}
-                                        />
-                                    </div>
-                                    <span className="text-xs text-white/60">
-                                        {selectedThread.episodes.filter(ep => ep.viewed).length}/{selectedThread.episodes.length}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Messages */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                {messages.map((message, index) => {
-                                    const isCurrentUser = message.userId === userData.id;
-                                    const sender = selectedThread.participants.find(p => p.id === message.userId);
-
-                                    return (
-                                        <motion.div
-                                            key={message.id}
-                                            className={`flex ${isCurrentUser ? 'justify-end' : ''}`}
-                                            initial={{ opacity: 0, y: 20, x: isCurrentUser ? 20 : -20 }}
-                                            animate={{ opacity: 1, y: 0, x: 0 }}
-                                            transition={{ delay: 0.1 * index }}
-                                        >
-                                            {!isCurrentUser && (
-                                                <div className="w-8 h-8 rounded-full overflow-hidden mr-2 flex-shrink-0">
-                                                    <img
-                                                        src={sender?.avatar}
-                                                        alt={sender?.name}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                </div>
-                                            )}
-
-                                            <motion.div
-                                                className={`max-w-[75%] relative ${isCurrentUser ? 'bg-gradient-to-r from-primary/30 to-primary-secondary/30' : 'bg-white/10'} rounded-2xl p-3 ${isCurrentUser ? 'rounded-tr-none' : 'rounded-tl-none'}`}
-                                                whileHover={{ scale: 1.02 }}
-                                            >
-                                                {/* Shimmer effect on hover */}
-                                                <motion.div
-                                                    className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/5 to-transparent rounded-2xl"
-                                                    initial={{ opacity: 0, x: -100 }}
-                                                    whileHover={{ opacity: 1, x: 200 }}
-                                                    transition={{ duration: 1 }}
-                                                />
-
-                                                <div className="flex items-center mb-1">
-                                                    <p className="text-xs font-semibold">{isCurrentUser ? 'You' : sender?.name}</p>
-                                                    <p className="text-xs text-white/40 ml-2">{message.timestamp}</p>
-                                                </div>
-
-                                                <p className="text-sm">{message.content}</p>
-
-                                                {message.episodeRef && (
-                                                    <motion.div
-                                                        className="mt-2 flex items-center text-xs bg-white/10 rounded-lg p-2 cursor-pointer"
-                                                        whileHover={{
-                                                            backgroundColor: "rgba(255,255,255,0.15)",
-                                                            scale: 1.05
-                                                        }}
-                                                        whileTap={{ scale: 0.98 }}
-                                                    >
-                                                        <div className="w-6 h-6 rounded-full bg-primary/30 flex items-center justify-center mr-2">
-                                                            <FaPlay className="text-[8px]" />
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-semibold">Episode {message.episodeRef.number}: {message.episodeRef.title}</p>
-                                                            <p className="text-white/60">{message.episodeRef.timestamp}</p>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="font-medium text-sm truncate">{relatedReel.title}</p>
+                                                            <p className="text-xs text-white/70 line-clamp-2">{relatedReel.description}</p>
                                                         </div>
                                                     </motion.div>
-                                                )}
-                                            </motion.div>
-                                        </motion.div>
-                                    );
-                                })}
-
-                                {/* Typing indicator */}
-                                {isTyping && (
-                                    <div className="flex">
-                                        <div className="w-8 h-8 rounded-full overflow-hidden mr-2 flex-shrink-0">
-                                            <img
-                                                src={selectedThread.participants.find(p => p.id !== userData.id)?.avatar}
-                                                alt=""
-                                                className="w-full h-full object-cover"
-                                            />
-                                        </div>
-                                        <div className="bg-white/10 rounded-2xl rounded-tl-none p-3 px-4">
-                                            <div className="flex space-x-1">
-                                                <motion.div
-                                                    className="w-2 h-2 bg-white/60 rounded-full"
-                                                    animate={{ y: [0, -6, 0] }}
-                                                    transition={{ duration: 1, repeat: Infinity, delay: 0 }}
-                                                />
-                                                <motion.div
-                                                    className="w-2 h-2 bg-white/60 rounded-full"
-                                                    animate={{ y: [0, -6, 0] }}
-                                                    transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
-                                                />
-                                                <motion.div
-                                                    className="w-2 h-2 bg-white/60 rounded-full"
-                                                    animate={{ y: [0, -6, 0] }}
-                                                    transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
-                                                />
-                                            </div>
+                                                ))
+                                            }
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-                                <div ref={messagesEndRef} />
+                {/* Keyboard Shortcuts Help */}
+                <AnimatePresence>
+                    {showKeyboardHelp && (
+                        <motion.div
+                            className="absolute inset-0 bg-black/80 backdrop-blur-md p-6 z-20"
+                            initial={{ opacity: 0, y: 50 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 50 }}
+                            transition={{ duration: 0.3 }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowKeyboardHelp(false);
+                            }}
+                        >
+                            <div className="flex justify-between items-center mb-6">
+                                <div className="flex items-center">
+                                    <FaKeyboard className="text-primary-light text-xl mr-2" />
+                                    <h3 className="text-2xl font-bold">Keyboard Shortcuts</h3>
+                                </div>
 
-                                {/* What-If UI */}
-                                {selectedThread.whatIfScenarios && selectedThread.whatIfScenarios.length > 0 && (
-                                    <div className="my-6">
-                                        <div className="flex justify-center">
-                                            <motion.button
-                                                className="bg-primary/20 text-primary-light rounded-full px-4 py-2 flex items-center text-sm"
-                                                whileHover={{
-                                                    scale: 1.05,
-                                                    backgroundColor: "rgba(143, 70, 193, 0.3)",
-                                                    boxShadow: "0 0 15px rgba(143, 70, 193, 0.3)"
-                                                }}
-                                                whileTap={{ scale: 0.95 }}
-                                                onClick={generateWhatIf}
-                                                animate={controls}
-                                            >
-                                                <FaLightbulb className="mr-2" />
-                                                <FaMagic className="mr-2" />
-                                                Generate What-If Scenario
-                                            </motion.button>
-                                        </div>
-
-                                        <AnimatePresence>
-                                            {showWhatIf && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, height: 0, y: 20 }}
-                                                    animate={{ opacity: 1, height: 'auto', y: 0 }}
-                                                    exit={{ opacity: 0, height: 0, y: -20 }}
-                                                    transition={{ type: "spring", damping: 20 }}
-                                                    className="mt-4 overflow-hidden"
-                                                >
-                                                    <motion.div
-                                                        className="bg-gradient-to-r from-primary/20 to-primary-secondary/20 rounded-xl p-4 border border-primary/30 relative"
-                                                        whileHover={{
-                                                            scale: 1.02,
-                                                            boxShadow: "0 10px 25px -5px rgba(143, 70, 193, 0.2)"
-                                                        }}
-                                                    >
-                                                        {/* Shimmer effect */}
-                                                        <motion.div
-                                                            className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/5 to-transparent rounded-xl"
-                                                            initial={{ x: -200 }}
-                                                            animate={{ x: 400 }}
-                                                            transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
-                                                        />
-
-                                                        <div className="flex justify-between items-start">
-                                                            <div className="flex items-center">
-                                                                <motion.div
-                                                                    className="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center mr-2"
-                                                                    animate={{
-                                                                        scale: [1, 1.1, 1],
-                                                                        boxShadow: [
-                                                                            "0 0 0 rgba(143, 70, 193, 0.4)",
-                                                                            "0 0 20px rgba(143, 70, 193, 0.6)",
-                                                                            "0 0 0 rgba(143, 70, 193, 0.4)"
-                                                                        ]
-                                                                    }}
-                                                                    transition={{ duration: 2, repeat: Infinity }}
-                                                                >
-                                                                    <FaLightbulb className="text-primary-light" />
-                                                                </motion.div>
-                                                                <h3 className="font-bold gradient-text">
-                                                                    What if... black holes are portals?
-                                                                </h3>
-                                                            </div>
-                                                            <motion.button
-                                                                className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center"
-                                                                whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.2)" }}
-                                                                whileTap={{ scale: 0.9 }}
-                                                                onClick={() => setShowWhatIf(false)}
-                                                            >
-                                                                <FaTimes className="text-xs" />
-                                                            </motion.button>
-                                                        </div>
-
-                                                        <p className="mt-2 text-sm ml-10">Alternative theory generated based on the series content. This could explain disappearing matter.</p>
-
-                                                        <div className="mt-3 ml-10">
-                                                            <motion.button
-                                                                className="bg-gradient-to-r from-primary/40 to-primary-secondary/40 hover:from-primary/50 hover:to-primary-secondary/50 rounded-full px-3 py-1 text-xs"
-                                                                whileHover={{
-                                                                    scale: 1.05,
-                                                                    boxShadow: "0 0 15px rgba(143, 70, 193, 0.3)"
-                                                                }}
-                                                                whileTap={{ scale: 0.95 }}
-                                                            >
-                                                                <span className="flex items-center">
-                                                                    <FaRandom className="mr-1" /> Explore this idea
-                                                                </span>
-                                                            </motion.button>
-                                                        </div>
-                                                    </motion.div>
-
-                                                    {/* Alternative scenarios */}
-                                                    <div className="mt-4 grid grid-cols-2 gap-3">
-                                                        {selectedThread.whatIfScenarios.slice(0, 2).map((scenario, idx) => (
-                                                            <motion.div
-                                                                key={scenario.id}
-                                                                className="bg-white/5 rounded-xl p-3 relative overflow-hidden"
-                                                                initial={{ opacity: 0, x: idx === 0 ? -20 : 20 }}
-                                                                animate={{ opacity: 1, x: 0 }}
-                                                                transition={{ delay: 0.3 }}
-                                                                whileHover={{
-                                                                    backgroundColor: "rgba(255,255,255,0.1)",
-                                                                    y: -3
-                                                                }}
-                                                            >
-                                                                <h4 className="text-sm font-semibold mb-1 text-primary-light">
-                                                                    {scenario.title}
-                                                                </h4>
-                                                                <p className="text-xs text-white/70">{scenario.description}</p>
-                                                            </motion.div>
-                                                        ))}
-                                                    </div>
-                                                </motion.div>
-                                            )}
-                                        </AnimatePresence>
-                                    </div>
-                                )}
+                                <motion.button
+                                    className="w-8 h-8 flex items-center justify-center bg-white/10 backdrop-blur-sm rounded-full"
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowKeyboardHelp(false);
+                                    }}
+                                >
+                                    ✕
+                                </motion.button>
                             </div>
 
-                            {/* Message Input */}
-                            <div className="p-3 border-t border-white/10">
-                                <div className="flex items-center bg-white/5 rounded-full px-4 py-2 focus-within:ring-1 focus-within:ring-primary/50">
-                                    <input
-                                        type="text"
-                                        placeholder="Message..."
-                                        className="bg-transparent flex-1 focus:outline-none text-sm"
-                                        value={newMessage}
-                                        onChange={e => setNewMessage(e.target.value)}
-                                        onKeyPress={handleKeyPress}
-                                    />
-                                    <div className="flex items-center space-x-2">
-                                        <motion.button
-                                            className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center"
-                                            whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.15)" }}
-                                            whileTap={{ scale: 0.9 }}
-                                        >
-                                            <FaPlay className="text-xs" />
-                                        </motion.button>
-                                        <motion.button
-                                            className="w-8 h-8 rounded-full bg-gradient-to-r from-primary to-primary-secondary flex items-center justify-center"
-                                            whileHover={{
-                                                scale: 1.1,
-                                                boxShadow: "0 0 15px rgba(143, 70, 193, 0.5)"
-                                            }}
-                                            whileTap={{ scale: 0.9 }}
-                                            onClick={handleSendMessage}
-                                            disabled={!newMessage.trim()}
-                                        >
-                                            <FaPaperPlane className="text-xs" />
-                                        </motion.button>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4">
+                                    <h4 className="font-semibold mb-3">Navigation</h4>
+
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                    <FaArrowUp className="text-sm" />
+                                                </div>
+                                                <span>Next episode</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                    <FaArrowDown className="text-sm" />
+                                                </div>
+                                                <span>Previous episode</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                    <FaArrowLeft className="text-sm" />
+                                                </div>
+                                                <span>Different series/content</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                    <FaArrowRight className="text-sm" />
+                                                </div>
+                                                <span>Related content</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4">
+                                    <h4 className="font-semibold mb-3">Controls</h4>
+
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                    <span className="text-sm">Space</span>
+                                                </div>
+                                                <span>Play/Pause</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                    <span className="text-sm">M</span>
+                                                </div>
+                                                <span>Mute/Unmute</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                    <span className="text-sm">L</span>
+                                                </div>
+                                                <span>Like</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                    <span className="text-sm">B</span>
+                                                </div>
+                                                <span>Save</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                    <span className="text-sm">I</span>
+                                                </div>
+                                                <span>Toggle info panel</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                    <span className="text-sm">W</span>
+                                                </div>
+                                                <span>Toggle &quot;What If&quot; scenarios</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                    <span className="text-sm">?</span>
+                                                </div>
+                                                <span>Show keyboard shortcuts</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="w-8 h-8 bg-white/10 rounded-md flex items-center justify-center mr-3">
+                                                    <span className="text-sm">ESC</span>
+                                                </div>
+                                                <span>Close any open panel</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </motion.div>
                     )}
+                </AnimatePresence>
 
-                    {/* Create Thread Flow */}
-                    {viewState === "create-thread" && (
-                        <div className="px-4 py-6">
-                            {/* Step 1: Content Preview */}
-                            {createThreadState.step === 1 && (
+                {/* Hearts animation when liking */}
+                <AnimatePresence>
+                    {isLiked && (
+                        <motion.div
+                            className="absolute inset-0 pointer-events-none overflow-hidden z-30"
+                            initial={{ opacity: 1 }}
+                            animate={{ opacity: 0 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 2 }}
+                        >
+                            {[...Array(15)].map((_, i) => (
                                 <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.4 }}
+                                    key={i}
+                                    className="absolute text-red-500"
+                                    initial={{
+                                        scale: 0,
+                                        opacity: 0.8,
+                                        x: Math.random() * window.innerWidth * 0.8,
+                                        y: window.innerHeight * 0.8
+                                    }}
+                                    animate={{
+                                        scale: Math.random() * 3 + 1,
+                                        opacity: 0,
+                                        x: Math.random() * window.innerWidth * 0.8,
+                                        y: Math.random() * window.innerHeight * 0.4
+                                    }}
+                                    transition={{
+                                        duration: Math.random() * 2 + 1,
+                                        ease: "easeOut"
+                                    }}
                                 >
-                                    <h3 className="text-lg font-semibold mb-4">Share Series</h3>
-
-                                    {/* Series preview */}
-                                    <div className="glass-card bg-white/5 rounded-xl overflow-hidden mb-6">
-                                        <div className="h-40 relative">
-                                            <img
-                                                src={getSeriesById(createThreadState.seriesId)?.thumbnailUrl}
-                                                alt={getSeriesById(createThreadState.seriesId)?.title}
-                                                className="w-full h-full object-cover"
-                                            />
-                                            <div className={`absolute inset-0 bg-gradient-to-tr opacity-60 ${getSeriesById(createThreadState.seriesId)?.color || 'from-primary to-primary-secondary'}`}></div>
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent"></div>
-                                            <div className="absolute bottom-0 left-0 w-full p-4">
-                                                <h4 className="text-xl font-bold">{getSeriesById(createThreadState.seriesId)?.title}</h4>
-                                                <p className="text-sm text-white/80">Part 1 of {getSeriesById(createThreadState.seriesId)?.episodes}</p>
-                                            </div>
-
-                                            {/* Animated tag */}
-                                            <motion.div
-                                                className="absolute top-3 right-3 bg-primary/80 text-white text-xs px-3 py-1 rounded-full"
-                                                initial={{ x: 20, opacity: 0 }}
-                                                animate={{ x: 0, opacity: 1 }}
-                                                transition={{ delay: 0.5 }}
-                                            >
-                                                {getSeriesById(createThreadState.seriesId)?.tags[0]}
-                                            </motion.div>
-                                        </div>
-
-                                        <div className="p-4">
-                                            <div className="mb-4 px-1">
-                                                <p className="text-sm text-white/80 mb-3">
-                                                    {getSeriesById(createThreadState.seriesId)?.description}
-                                                </p>
-
-                                                <div className="flex items-center space-x-2">
-                                                    <div className="flex items-center space-x-1 text-sm text-white/60">
-                                                        <FaClock className="text-xs" />
-                                                        <span>5-7 min per episode</span>
-                                                    </div>
-                                                    <div className="h-4 w-px bg-white/20"></div>
-                                                    <div className="flex items-center space-x-1 text-sm text-white/60">
-                                                        <FaGraduationCap className="text-xs" />
-                                                        <span>Beginner friendly</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="mb-5">
-                                                <h5 className="font-semibold mb-3">Share Options</h5>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <motion.button
-                                                        className="glass-card bg-white/5 p-3 rounded-xl flex flex-col items-center justify-center border-2 border-primary"
-                                                        whileHover={{
-                                                            backgroundColor: "rgba(255,255,255,0.1)",
-                                                            y: -5,
-                                                            boxShadow: "0 10px 25px -5px rgba(143, 70, 193, 0.3)"
-                                                        }}
-                                                        animate={{
-                                                            boxShadow: ["0 0 0px rgba(143, 70, 193, 0.3)", "0 0 20px rgba(143, 70, 193, 0.5)", "0 0 0px rgba(143, 70, 193, 0.3)"]
-                                                        }}
-                                                        transition={{ duration: 2, repeat: Infinity }}
-                                                    >
-                                                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center mb-2">
-                                                            <FaComment className="text-primary-light" />
-                                                        </div>
-                                                        <span className="text-sm font-semibold">Create Thread</span>
-                                                        <span className="text-xs text-white/60">Discuss with friends</span>
-                                                    </motion.button>
-
-                                                    <motion.button
-                                                        className="glass-card bg-white/5 p-3 rounded-xl flex flex-col items-center justify-center"
-                                                        whileHover={{
-                                                            backgroundColor: "rgba(255,255,255,0.1)",
-                                                            y: -5
-                                                        }}
-                                                    >
-                                                        <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-2">
-                                                            <FaShareAlt className="text-white/80" />
-                                                        </div>
-                                                        <span className="text-sm font-semibold">Share Link</span>
-                                                        <span className="text-xs text-white/60">Copy or send</span>
-                                                    </motion.button>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex justify-end">
-                                                <motion.button
-                                                    className="bg-gradient-to-r from-primary to-primary-secondary hover:from-primary-dark hover:to-primary-secondary rounded-full px-4 py-2 flex items-center"
-                                                    whileHover={{
-                                                        scale: 1.05,
-                                                        boxShadow: "0 5px 15px rgba(143, 70, 193, 0.4)"
-                                                    }}
-                                                    whileTap={{ scale: 0.95 }}
-                                                    onClick={() => setCreateThreadState(prev => ({ ...prev, step: 2 }))}
-                                                >
-                                                    <span className="mr-2">Create Thread</span>
-                                                    <FaPlus className="text-xs" />
-                                                </motion.button>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <FaHeart className="text-2xl" />
                                 </motion.div>
-                            )}
-
-                            {/* Step 2: Friend Selection */}
-                            {createThreadState.step === 2 && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.4 }}
-                                >
-                                    <h3 className="text-lg font-semibold mb-4">Select Friends</h3>
-
-                                    {/* Search bar */}
-                                    <div className="relative mb-6">
-                                        <input
-                                            type="text"
-                                            placeholder="Search friends..."
-                                            className="w-full bg-white/5 rounded-full px-4 py-2 pl-10 focus:outline-none focus:ring-1 focus:ring-primary"
-                                        />
-                                        <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/40" />
-                                    </div>
-
-                                    {/* Selected Friends */}
-                                    <AnimatePresence>
-                                        {createThreadState.selectedFriends.length > 0 && (
-                                            <motion.div
-                                                className="mb-4"
-                                                initial={{ height: 0, opacity: 0 }}
-                                                animate={{ height: 'auto', opacity: 1 }}
-                                                exit={{ height: 0, opacity: 0 }}
-                                            >
-                                                <p className="text-sm text-white/60 mb-2">Selected ({createThreadState.selectedFriends.length})</p>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {createThreadState.selectedFriends.map((friend, index) => (
-                                                        <motion.div
-                                                            key={friend.id}
-                                                            className="flex items-center bg-primary/20 rounded-full pl-2 pr-3 py-1"
-                                                            onClick={() => toggleFriendSelection(friend)}
-                                                            initial={{ opacity: 0, scale: 0.5 }}
-                                                            animate={{ opacity: 1, scale: 1 }}
-                                                            exit={{ opacity: 0, scale: 0.5, x: -20 }}
-                                                            transition={{ delay: index * 0.05 }}
-                                                            whileHover={{
-                                                                backgroundColor: "rgba(143, 70, 193, 0.3)",
-                                                            }}
-                                                            whileTap={{ scale: 0.95 }}
-                                                        >
-                                                            <div className="w-6 h-6 rounded-full overflow-hidden mr-2">
-                                                                <img
-                                                                    src={friend.avatar}
-                                                                    alt={friend.name}
-                                                                    className="w-full h-full object-cover"
-                                                                />
-                                                            </div>
-                                                            <span className="text-sm">{friend.name}</span>
-                                                            <motion.div
-                                                                whileHover={{ rotate: 90 }}
-                                                                transition={{ duration: 0.2 }}
-                                                            >
-                                                                <FaTimes className="ml-2 text-xs" />
-                                                            </motion.div>
-                                                        </motion.div>
-                                                    ))}
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-
-                                    {/* Friends list */}
-                                    <motion.div variants={staggerContainer} initial="hidden" animate="show">
-                                        <motion.p
-                                            className="text-sm text-white/60 mb-2"
-                                            variants={staggerItem}
-                                        >
-                                            Suggested
-                                        </motion.p>
-                                        <div className="space-y-3">
-                                            {friendsData.map((friend, index) => (
-                                                <motion.div
-                                                    key={friend.id}
-                                                    className="flex items-center justify-between p-3 bg-white/5 rounded-xl"
-                                                    variants={staggerItem}
-                                                    whileHover={{
-                                                        backgroundColor: "rgba(255,255,255,0.1)",
-                                                        y: -2,
-                                                        boxShadow: "0 5px 15px rgba(0, 0, 0, 0.1)"
-                                                    }}
-                                                    whileTap={{ scale: 0.98 }}
-                                                    onClick={() => toggleFriendSelection(friend)}
-                                                >
-                                                    <div className="flex items-center">
-                                                        <div className="relative">
-                                                            <div className="w-10 h-10 rounded-full overflow-hidden">
-                                                                <img
-                                                                    src={friend.avatar}
-                                                                    alt={friend.name}
-                                                                    className="w-full h-full object-cover"
-                                                                />
-                                                            </div>
-                                                            {friend.isOnline && (
-                                                                <motion.div
-                                                                    className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background"
-                                                                    animate={{
-                                                                        boxShadow: [
-                                                                            "0 0 0px rgba(74, 222, 128, 0)",
-                                                                            "0 0 8px rgba(74, 222, 128, 0.6)",
-                                                                            "0 0 0px rgba(74, 222, 128, 0)"
-                                                                        ]
-                                                                    }}
-                                                                    transition={{ duration: 2, repeat: Infinity }}
-                                                                ></motion.div>
-                                                            )}
-                                                        </div>
-
-                                                        <div className="ml-3">
-                                                            <p className="font-semibold">{friend.name}</p>
-                                                            <p className="text-xs text-white/60">
-                                                                {friend.isOnline ? 'Online now' : friend.lastActive ? `Last active: ${friend.lastActive}` : ''}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className={`w-6 h-6 rounded-full ${createThreadState.selectedFriends.some(f => f.id === friend.id) ? 'bg-primary' : 'bg-white/10'} flex items-center justify-center`}>
-                                                        {createThreadState.selectedFriends.some(f => f.id === friend.id) && (
-                                                            <FaCheck className="text-xs" />
-                                                        )}
-                                                    </div>
-                                                </motion.div>
-                                            ))}
-                                        </div>
-                                    </motion.div>
-
-                                    {/* Create button */}
-                                    <div className="mt-8 flex justify-end">
-                                        <motion.button
-                                            className={`rounded-full px-6 py-3 flex items-center ${createThreadState.selectedFriends.length > 0 ? 'bg-gradient-to-r from-primary to-primary-secondary' : 'bg-white/10'}`}
-                                            whileHover={createThreadState.selectedFriends.length > 0 ? {
-                                                scale: 1.05,
-                                                boxShadow: "0 10px 25px -5px rgba(143, 70, 193, 0.3)"
-                                            } : {}}
-                                            whileTap={createThreadState.selectedFriends.length > 0 ? { scale: 0.95 } : {}}
-                                            disabled={createThreadState.selectedFriends.length === 0}
-                                            onClick={() => setViewState("profile")}
-                                        >
-                                            <span>Create Thread</span>
-                                        </motion.button>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </div>
+                            ))}
+                        </motion.div>
                     )}
-                </motion.main>
-            </AnimatePresence>
-
-            {/* Bottom Navigation */}
-            <motion.nav
-                className="fixed bottom-0 inset-x-0 h-16 bg-background/80 backdrop-blur-md border-t border-white/10 flex items-center justify-around z-20"
-                initial={{ y: 80 }}
-                animate={{ y: 0 }}
-                transition={{ delay: 0.5, type: "spring", stiffness: 300, damping: 30 }}
-            >
-                <motion.button
-                    className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ scale: 1.1, y: -2 }}
-                    whileTap={{ scale: 0.9 }}
-                >
-                    <div className="w-6 h-6 flex items-center justify-center mb-1">
-                        <FaVideo className="text-white/60" />
-                    </div>
-                    <span className="text-xs text-white/60">Feed</span>
-                </motion.button>
-
-                <motion.button
-                    className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ scale: 1.1, y: -2 }}
-                    whileTap={{ scale: 0.9 }}
-                >
-                    <div className="w-6 h-6 flex items-center justify-center mb-1">
-                        <FaSearch className="text-white/60" />
-                    </div>
-                    <span className="text-xs text-white/60">Explore</span>
-                </motion.button>
-
-                <motion.button
-                    className="flex flex-col items-center justify-center"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                >
-                    <motion.div
-                        className="w-12 h-12 rounded-full bg-gradient-to-r from-primary to-primary-secondary flex items-center justify-center -mt-6"
-                        animate={{
-                            boxShadow: [
-                                "0 0 0px rgba(143, 70, 193, 0.3)",
-                                "0 0 20px rgba(143, 70, 193, 0.5)",
-                                "0 0 0px rgba(143, 70, 193, 0.3)"
-                            ]
-                        }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                    >
-                        <FaPlus />
-                    </motion.div>
-                </motion.button>
-
-                <motion.button
-                    className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ scale: 1.1, y: -2 }}
-                    whileTap={{ scale: 0.9 }}
-                >
-                    <div className="w-6 h-6 flex items-center justify-center mb-1">
-                        <FaComment className="text-white/60" />
-                    </div>
-                    <span className="text-xs text-white/60">Threads</span>
-                </motion.button>
-
-                <motion.button
-                    className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ scale: 1.1, y: -2 }}
-                    whileTap={{ scale: 0.9 }}
-                >
-                    <div className="w-6 h-6 flex items-center justify-center mb-1">
-                        <FaUser className="text-primary-light" />
-                    </div>
-                    <span className="text-xs text-primary-light">Profile</span>
-                </motion.button>
-            </motion.nav>
-
-            {/* CSS Styles */}
-            <style jsx global>{`
-        .glass-card {
-          background: rgba(36, 27, 46, 0.4);
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          transition: all 0.3s ease;
-        }
-        
-        .gradient-text {
-          background: linear-gradient(to right, var(--primary), var(--primary-secondary));
-          -webkit-background-clip: text;
-          background-clip: text;
-          color: transparent;
-        }
-      `}</style>
+                </AnimatePresence>
+            </div>
         </div>
     );
 }

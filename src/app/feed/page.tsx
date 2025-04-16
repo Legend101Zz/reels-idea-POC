@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-//@ts-nocheck
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -9,6 +8,7 @@ import ReelPlayer from '@/components/ReelPlayer';
 import ThreadView from '@/components/ThreadView';
 import NavigationGuide from '@/components/NavigationGuide';
 import SwipeIndicators from '@/components/ui/SwipeIndicators';
+import EpisodeIndicator from '@/components/EpisodeIndicator';
 import { reels } from '@/data/reels';
 import { users } from '@/data/users';
 
@@ -42,36 +42,20 @@ export default function FeedPage() {
         };
     }, []);
 
-    // Initial load effect - select a good starting reel
+    // Initial load effect
     useEffect(() => {
         // Start with a series first episode as default
         const seriesReels = reels.filter(reel => reel.seriesId && reel.episodeNumber === 1);
 
-        // Try to use a quality reel with videos and thumbnails
-        let selectedReel;
         if (seriesReels.length > 0) {
-            // Prioritize series with thumbnails for a better initial experience
-            const reelsWithThumbnails = seriesReels.filter(reel =>
-                reel.thumbnailUrl && reel.thumbnailUrl !== '/images/default-thumb.png'
-            );
-
-            if (reelsWithThumbnails.length > 0) {
-                // Choose a random reel with a thumbnail
-                selectedReel = reelsWithThumbnails[Math.floor(Math.random() * reelsWithThumbnails.length)];
-            } else {
-                // Fall back to any series reel
-                selectedReel = seriesReels[Math.floor(Math.random() * seriesReels.length)];
-            }
+            const randomIndex = Math.floor(Math.random() * seriesReels.length);
+            setCurrentReelId(seriesReels[randomIndex].id);
         } else if (reels.length > 0) {
             // Fallback to any reel
-            selectedReel = reels[0];
+            setCurrentReelId(reels[0].id);
         }
 
-        if (selectedReel) {
-            setCurrentReelId(selectedReel.id);
-        }
-
-        // Simulate loading with a nice animation
+        // Simulate loading
         initialLoadTimer.current = setTimeout(() => {
             setIsLoading(false);
 
@@ -80,7 +64,7 @@ export default function FeedPage() {
             directionsTimeout.current = setTimeout(() => {
                 setShowDirectionHints(false);
             }, 4000);
-        }, 1500); // A bit longer for a smoother experience
+        }, 1000);
 
         return () => {
             if (initialLoadTimer.current) clearTimeout(initialLoadTimer.current);
@@ -101,7 +85,6 @@ export default function FeedPage() {
         }
     }, []);
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const handleThreadOpen = (reelId: string) => {
         setThreadId(undefined);
         setShowThread(true);
@@ -113,7 +96,6 @@ export default function FeedPage() {
         setThreadId(undefined);
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const handleCreateThread = (participants: typeof users) => {
         // In a real app, we'd create a thread in the backend
         setShowThread(false);
@@ -138,11 +120,11 @@ export default function FeedPage() {
     const handleVideoComplete = () => {
         setVideoCompleted(true);
 
-        // Show direction hints when video completes, but only on mobile
-        if (!isDesktop) {
-            setShowDirectionHints(true);
+        // Show direction hints when video completes
+        setShowDirectionHints(true);
 
-            // Keep the hints visible longer
+        // On mobile, keep the hints visible longer
+        if (!isDesktop) {
             if (directionsTimeout.current) {
                 clearTimeout(directionsTimeout.current);
             }
@@ -154,82 +136,33 @@ export default function FeedPage() {
 
     return (
         <div className="h-screen w-full bg-background relative overflow-hidden">
-            {/* Loading Overlay with enhanced animation */}
+            {/* Loading Overlay */}
             <AnimatePresence>
                 {isLoading && (
                     <motion.div
-                        className="absolute inset-0 z-50 bg-background flex flex-col items-center justify-center"
+                        className="absolute inset-0 z-50 bg-background flex items-center justify-center"
                         initial={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.5 }}
                     >
                         <motion.div
-                            className="relative w-20 h-20"
-                            initial={{ scale: 0.8 }}
-                            animate={{ scale: 1 }}
-                            transition={{ duration: 0.5 }}
-                        >
-                            {/* Animated rings around the logo */}
-                            <motion.div
-                                className="absolute inset-0 border-4 border-primary/30 rounded-full"
-                                animate={{
-                                    scale: [1, 1.5, 1],
-                                    opacity: [0.3, 0, 0.3],
-                                }}
-                                transition={{
-                                    duration: 2,
-                                    repeat: Infinity,
-                                    ease: "easeInOut"
-                                }}
-                            />
-                            <motion.div
-                                className="absolute inset-0 border-4 border-primary-secondary/30 rounded-full"
-                                animate={{
-                                    scale: [1, 1.8, 1],
-                                    opacity: [0.3, 0, 0.3],
-                                }}
-                                transition={{
-                                    duration: 2,
-                                    repeat: Infinity,
-                                    delay: 0.5,
-                                    ease: "easeInOut"
-                                }}
-                            />
-
-                            {/* Logo */}
-                            <div className="w-20 h-20 bg-gradient-to-r from-primary to-primary-secondary rounded-full flex items-center justify-center text-white z-10 relative">
-                                <motion.span
-                                    className="text-2xl font-bold"
-                                    animate={{ opacity: [0.7, 1, 0.7] }}
-                                    transition={{ duration: 1.5, repeat: Infinity }}
-                                >
-                                    K
-                                </motion.span>
-                            </div>
-                        </motion.div>
-
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                            className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full"
+                        />
                         <motion.div
-                            className="mt-6 relative h-1 w-40 bg-white/10 rounded-full overflow-hidden"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3 }}
-                        >
-                            <motion.div
-                                className="absolute h-full bg-gradient-to-r from-primary to-primary-secondary rounded-full"
-                                initial={{ width: "0%" }}
-                                animate={{ width: "100%" }}
-                                transition={{ duration: 1.2, ease: "easeInOut" }}
-                            />
-                        </motion.div>
-
-                        <motion.p
-                            className="text-white/60 mt-6 text-sm"
+                            className="absolute mt-24"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ delay: 0.5 }}
                         >
-                            Loading educational content...
-                        </motion.p>
+                            <div className="text-center">
+                                <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-secondary">
+                                    KnowScroll
+                                </h2>
+                                <p className="text-sm text-white/60 mt-1">Loading your knowledge feed...</p>
+                            </div>
+                        </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -241,16 +174,16 @@ export default function FeedPage() {
                     onThreadOpen={handleThreadOpen}
                     onReelChange={handleReelChange}
                     onVideoComplete={handleVideoComplete}
-                    showArrows={isDesktop} // Only show arrows on desktop
+                    showArrows={isDesktop}
                 />
             )}
 
             {/* Navigation Direction Indicators - Only for mobile when video completes */}
-            {!isLoading && currentReelId && !isDesktop && (
+            {!isLoading && currentReelId && (!isDesktop || videoCompleted) && (
                 <SwipeIndicators
                     currentReelId={currentReelId}
                     isDesktop={isDesktop}
-                    isVisible={showDirectionHints || videoCompleted}
+                    isVisible={showDirectionHints}
                 />
             )}
 
@@ -269,21 +202,11 @@ export default function FeedPage() {
                 </motion.button>
             )}
 
-            {/* Enhanced Bottom Navigation */}
-            <motion.div
-                className="absolute bottom-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-md border-t border-white/5 flex items-center justify-around z-30"
-                initial={{ y: 100 }}
-                animate={{ y: 0 }}
-                transition={{
-                    type: "spring",
-                    damping: 20,
-                    stiffness: 100,
-                    delay: 0.3
-                }}
-            >
+            {/* Bottom Navigation */}
+            <div className="absolute bottom-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-md border-t border-white/5 flex items-center justify-around z-30">
                 <motion.button
                     className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                 >
                     <FaHome className="text-xl mb-1 text-white/80" />
@@ -292,7 +215,7 @@ export default function FeedPage() {
 
                 <motion.button
                     className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                 >
                     <FaCompass className="text-xl mb-1 text-white/80" />
@@ -300,38 +223,21 @@ export default function FeedPage() {
                 </motion.button>
 
                 <motion.button
-                    className="flex flex-col items-center justify-center -mt-8 relative"
+                    className="flex flex-col items-center justify-center -mt-8"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                 >
                     <motion.div
-                        className="w-14 h-14 rounded-full bg-gradient-to-r from-primary to-primary-secondary flex items-center justify-center shadow-lg"
-                        whileHover={{
-                            boxShadow: "0 0 20px rgba(143, 70, 193, 0.4)",
-                            scale: 1.05
-                        }}
+                        className="w-14 h-14 rounded-full bg-gradient-to-r from-primary to-primary-secondary flex items-center justify-center shadow-lg shadow-primary/20"
+                        whileHover={{ boxShadow: "0 0 20px rgba(143, 70, 193, 0.4)" }}
                     >
                         <FaPlus className="text-xl" />
                     </motion.div>
-
-                    {/* Pulsing effect around the button */}
-                    <motion.div
-                        className="absolute inset-0 rounded-full border-2 border-primary/50"
-                        animate={{
-                            scale: [1, 1.15, 1],
-                            opacity: [0.5, 0, 0.5],
-                        }}
-                        transition={{
-                            duration: 2,
-                            repeat: Infinity,
-                            repeatType: "loop",
-                        }}
-                    />
                 </motion.button>
 
                 <motion.button
                     className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                 >
                     <div className="relative">
@@ -347,7 +253,7 @@ export default function FeedPage() {
 
                 <motion.button
                     className="flex flex-col items-center justify-center w-16"
-                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                 >
                     <div className="relative">
@@ -361,7 +267,7 @@ export default function FeedPage() {
                     </div>
                     <span className="text-xs text-white/60">Profile</span>
                 </motion.button>
-            </motion.div>
+            </div>
 
             {/* Thread Modal */}
             <AnimatePresence>
@@ -389,7 +295,7 @@ export default function FeedPage() {
                             className="bg-black/70 backdrop-blur-md rounded-xl px-4 py-3 text-center max-w-xs"
                             whileHover={{ scale: 1.02 }}
                         >
-                            <p className="text-sm mb-2">Welcome to KnowScroll! Swipe in different directions to navigate content</p>
+                            <p className="text-sm mb-2">Welcome! Try swiping in different directions to navigate</p>
                             <div className="grid grid-cols-2 gap-2 mb-3">
                                 <div className="flex items-center justify-center bg-white/5 rounded-lg p-2">
                                     <motion.div
@@ -416,7 +322,7 @@ export default function FeedPage() {
                                     >
                                         <span className="mr-1">←</span>
                                     </motion.div>
-                                    <span className="text-xs">Different series</span>
+                                    <span className="text-xs">Alternate view</span>
                                 </div>
                                 <div className="flex items-center justify-center bg-white/5 rounded-lg p-2">
                                     <motion.div
@@ -430,7 +336,7 @@ export default function FeedPage() {
                             </div>
                             <motion.button
                                 className="px-4 py-2 bg-gradient-to-r from-primary to-primary-secondary rounded-full text-sm"
-                                whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(143, 70, 193, 0.4)" }}
+                                whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => setIsFirstVisit(false)}
                             >
