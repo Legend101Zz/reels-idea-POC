@@ -1053,7 +1053,7 @@ export default function CreatePage() {
                                                             <span className="font-medium">HyperReel</span>
                                                         </div>
                                                         <p className="text-sm text-white/70 mt-1">
-                                                            Alternate version of "{originalVersionId === 'laser-main' ? 'How Lasers Work' : originalVersionId === 'ai-intro' ? 'The AI Revolution: An Introduction' : 'original content'}"
+                                                            Alternate version of &quot;{originalVersionId === 'laser-main' ? 'How Lasers Work' : originalVersionId === 'ai-intro' ? 'The AI Revolution: An Introduction' : 'original content'}&quot;
                                                         </p>
                                                     </div>
                                                 )}
